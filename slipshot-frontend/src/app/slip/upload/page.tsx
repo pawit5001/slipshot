@@ -288,11 +288,11 @@ export default function SlipUploadPage() {
 
     // Validate ก่อนบันทึก
     if (!slip.form.account_name.trim()) {
-      await showAlert("กรุณากรอกชื่อรายการ", "error");
+      await showAlert("error", "ข้อมูลไม่ครบ", "กรุณากรอกชื่อรายการ");
       return;
     }
     if (!slip.form.amount || isNaN(Number(slip.form.amount)) || Number(slip.form.amount) <= 0) {
-      await showAlert("กรุณากรอกจำนวนเงินให้ถูกต้อง", "error");
+      await showAlert("error", "ข้อมูลไม่ครบ", "กรุณากรอกจำนวนเงินให้ถูกต้อง");
       return;
     }
 
@@ -318,7 +318,7 @@ export default function SlipUploadPage() {
         setSlips(prev => prev.map(s => 
           s.id === slipId ? { ...s, saving: false, error: errorMsg } : s
         ));
-        await showAlert(errorMsg, "error");
+        await showAlert("error", "ไม่สำเร็จ", errorMsg);
         return;
       }
 
@@ -338,7 +338,7 @@ export default function SlipUploadPage() {
           error: errorMsg
         } : s
       ));
-      await showAlert(errorMsg, "error");
+      await showAlert("error", "ไม่สำเร็จ", errorMsg);
     }
   };
 

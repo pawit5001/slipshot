@@ -980,4 +980,155 @@ class LeaderboardView(APIView):
 
 
 def home(request):
-	return HttpResponse("Hello, Slipshot!")
+	html = """
+	<!DOCTYPE html>
+	<html lang="th">
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<title>404 - Not Found</title>
+		<style>
+			* { margin: 0; padding: 0; box-sizing: border-box; }
+			body {
+				font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+				background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f23 100%);
+				min-height: 100vh;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				color: #fff;
+				overflow: hidden;
+			}
+			.container {
+				text-align: center;
+				padding: 40px;
+				position: relative;
+				z-index: 1;
+			}
+			.error-code {
+				font-size: 150px;
+				font-weight: 900;
+				background: linear-gradient(45deg, #ff6b6b, #ee5a5a, #ff8e8e);
+				-webkit-background-clip: text;
+				-webkit-text-fill-color: transparent;
+				background-clip: text;
+				text-shadow: 0 0 80px rgba(255, 107, 107, 0.5);
+				animation: pulse 2s ease-in-out infinite;
+			}
+			@keyframes pulse {
+				0%, 100% { opacity: 1; transform: scale(1); }
+				50% { opacity: 0.8; transform: scale(1.02); }
+			}
+			.icon {
+				font-size: 80px;
+				margin-bottom: 20px;
+				animation: shake 0.5s ease-in-out infinite;
+			}
+			@keyframes shake {
+				0%, 100% { transform: rotate(0deg); }
+				25% { transform: rotate(-5deg); }
+				75% { transform: rotate(5deg); }
+			}
+			h1 {
+				font-size: 32px;
+				margin: 20px 0;
+				color: #ff6b6b;
+			}
+			p {
+				font-size: 18px;
+				color: #888;
+				margin-bottom: 30px;
+				max-width: 400px;
+			}
+			.warning-tape {
+				position: fixed;
+				width: 200%;
+				height: 40px;
+				background: repeating-linear-gradient(
+					45deg,
+					#ff6b6b,
+					#ff6b6b 20px,
+					#1a1a2e 20px,
+					#1a1a2e 40px
+				);
+				opacity: 0.3;
+			}
+			.tape-top { top: 50px; left: -50%; transform: rotate(-5deg); }
+			.tape-bottom { bottom: 50px; left: -50%; transform: rotate(5deg); }
+			.lock-icon {
+				width: 100px;
+				height: 100px;
+				margin: 0 auto 20px;
+				position: relative;
+			}
+			.lock-body {
+				width: 60px;
+				height: 50px;
+				background: #ff6b6b;
+				border-radius: 8px;
+				margin: 0 auto;
+				position: relative;
+			}
+			.lock-shackle {
+				width: 40px;
+				height: 30px;
+				border: 8px solid #ff6b6b;
+				border-bottom: none;
+				border-radius: 20px 20px 0 0;
+				margin: 0 auto;
+				position: relative;
+				top: 8px;
+			}
+			.particles {
+				position: fixed;
+				top: 0;
+				left: 0;
+				width: 100%;
+				height: 100%;
+				pointer-events: none;
+				overflow: hidden;
+			}
+			.particle {
+				position: absolute;
+				width: 4px;
+				height: 4px;
+				background: #ff6b6b;
+				border-radius: 50%;
+				opacity: 0.5;
+				animation: float 15s infinite;
+			}
+			@keyframes float {
+				0%, 100% { transform: translateY(100vh) rotate(0deg); opacity: 0; }
+				10% { opacity: 0.5; }
+				90% { opacity: 0.5; }
+				100% { transform: translateY(-100vh) rotate(720deg); opacity: 0; }
+			}
+		</style>
+	</head>
+	<body>
+		<div class="warning-tape tape-top"></div>
+		<div class="warning-tape tape-bottom"></div>
+		<div class="particles">
+			<div class="particle" style="left: 10%; animation-delay: 0s;"></div>
+			<div class="particle" style="left: 20%; animation-delay: 2s;"></div>
+			<div class="particle" style="left: 30%; animation-delay: 4s;"></div>
+			<div class="particle" style="left: 40%; animation-delay: 1s;"></div>
+			<div class="particle" style="left: 50%; animation-delay: 3s;"></div>
+			<div class="particle" style="left: 60%; animation-delay: 5s;"></div>
+			<div class="particle" style="left: 70%; animation-delay: 2.5s;"></div>
+			<div class="particle" style="left: 80%; animation-delay: 1.5s;"></div>
+			<div class="particle" style="left: 90%; animation-delay: 4.5s;"></div>
+		</div>
+		<div class="container">
+			<div class="lock-icon">
+				<div class="lock-shackle"></div>
+				<div class="lock-body"></div>
+			</div>
+			<div class="error-code">404</div>
+			<h1>🚫 ACCESS DENIED</h1>
+			<p>ไม่พบหน้าที่คุณต้องการ หรือคุณไม่มีสิทธิ์เข้าถึงส่วนนี้</p>
+		</div>
+	</body>
+	</html>
+	"""
+	return HttpResponse(html, status=404, content_type='text/html')
