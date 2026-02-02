@@ -1,0 +1,55 @@
+# Python
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+.Python
+venv/
+env/
+.venv/
+pip-log.txt
+*.log
+
+# Django
+db.sqlite3
+staticfiles/
+*.pot
+*.mo
+
+# Environment
+.env
+.env.local
+.env*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node.js
+node_modules/
+.next/
+out/
+build/
+.pnp
+.pnp.js
+
+# Testing
+coverage/
+.coverage
+.pytest_cache/
+htmlcov/
+
+# Media uploads (keep folder structure)
+slipshot_backend/media/*
+!slipshot_backend/media/.gitkeep
+
+# Misc
+*.pem
+.vercel
+*.tsbuildinfo
