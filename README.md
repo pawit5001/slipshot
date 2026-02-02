@@ -1,102 +1,111 @@
+
 # 🧾 SlipShot - Smart Slip Management System
 
-ระบบจัดการสลิปการเงินอัจฉริยะ ที่ดึงข้อมูลจากสลิปอัตโนมัติด้วย OCR รองรับการจัดหมวดหมู่ ติดตามรายรับ-รายจ่าย และแสดงสถิติ
+An intelligent web application for managing and extracting data from payment slips using OCR. Features include categorization, income/expense tracking, statistics dashboard, and admin management.
 
-## ✨ Key Features
-
-- 📸 **Auto Slip Reading** - ดึงข้อมูลจากสลิปอัตโนมัติด้วย OCR
-- 📊 **Dashboard** - สรุปรายรับ-รายจ่ายพร้อมกราฟ
-- 🏷️ **Tags** - จัดหมวดหมู่รายการ
-- 👑 **Admin Panel** - จัดการผู้ใช้และดูสถิติระบบ
-- 🏆 **Leaderboard** - อันดับผู้ใช้งาน
-- 🔐 **Auth** - ระบบล็อกอินด้วย JWT
-
-## 🛠️ Tech Stack
-
-| Backend | Frontend |
-|---------|----------|
-| Django 5.2 | Next.js 16 |
-| Django REST Framework | TypeScript |
-| PostgreSQL | Tailwind CSS 4 |
-| OCR.space API | React |
-| JWT Auth | |
+![Django](https://img.shields.io/badge/Django-5.2-green?style=flat-square&logo=django&logoColor=white)
+![Next.js](https://img.shields.io/badge/Next.js-16.1.6-black?style=flat-square&logo=next.js&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14+-336791?style=flat-square&logo=postgresql&logoColor=white)
+![TailwindCSS](https://img.shields.io/badge/TailwindCSS-4.0-38BDF8?style=flat-square&logo=tailwindcss&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178C6?style=flat-square&logo=typescript&logoColor=white)
 
 ---
 
-## � Prerequisites
+## 📋 Table of Contents
 
-- Python 3.11+
-- Node.js 20+
-- PostgreSQL 14+
-- Git
+- [Features](#-features)
+- [Requirements](#-requirements)
+- [Installation](#-installation)
+- [Usage Guide](#-usage-guide)
+- [Project Structure](#-project-structure)
+- [API Endpoints](#-api-endpoints)
+- [Troubleshooting](#-troubleshooting)
+- [License](#-license)
+
+---
+
+## ✨ Features
+
+### 📱 Core Features
+- ✅ Upload and extract data from payment slips (OCR)
+- ✅ Dashboard with income/expense summary and charts
+- ✅ Categorize transactions with tags
+- ✅ User authentication (JWT, httpOnly cookie)
+- ✅ Admin panel for user and system management
+- ✅ Leaderboard for user activity
+- ✅ Responsive web design
+
+### 🎨 UI/UX
+- ✅ Modern, clean interface (Next.js + Tailwind CSS)
+- ✅ Mobile-friendly layout
+- ✅ Intuitive navigation and alerts
+- ✅ Image gallery for slip uploads
+
+---
+
+## 💻 Requirements
+
+| Item | Minimum Version |
+|------|-----------------|
+| Python | 3.11 or higher |
+| Node.js | 20 or higher |
+| PostgreSQL | 14 or higher |
+| Git | Any |
 
 ---
 
 ## 🚀 Installation
 
-### 1. Clone Repository
-
+### 1. Clone the Repository
 ```bash
 git clone https://github.com/yourusername/slipshot.git
 cd slipshot
 ```
 
 ### 2. Backend Setup
-
 ```bash
 cd slipshot_backend
-
-# Create Virtual Environment
 python -m venv venv
-
 # Activate (Windows)
 .\venv\Scripts\activate
-
 # Activate (macOS/Linux)
 source venv/bin/activate
-
-# Install Dependencies
 pip install -r requirements.txt
-
-# Configure environment
 cp .env.example .env
 # Edit .env with your settings
-
-# Run migrations
 python manage.py migrate
-
-# Create admin user
 python manage.py createsuperuser
-
-# Start server
 python manage.py runserver
 ```
 
 ### 3. Frontend Setup
-
 ```bash
 cd slipshot-frontend
-
-# Install Dependencies
 npm install
-
-# Configure environment
 cp .env.example .env.local
 # Set NEXT_PUBLIC_API_URL=http://localhost:8000
-
-# Start server
 npm run dev
 ```
 
 ### 4. Access
-
 - **Frontend**: http://localhost:3000
 - **Backend API**: http://localhost:8000/api/
 - **Admin Panel**: http://localhost:8000/admin/
 
 ---
 
-## �📁 Project Structure
+## 📖 Usage Guide
+
+1. Register or log in to your account
+2. Upload payment slip images on the Slip page
+3. Review and edit extracted slip data
+4. Categorize slips with tags
+5. View statistics and charts on the Dashboard
+6. Manage users and view system stats in the Admin Panel (admin only)
+
+---
+
+## 📁 Project Structure
 
 ```
 slipshot/
@@ -168,6 +177,21 @@ slipshot/
 
 ---
 
+## 🔧 Troubleshooting
+
+### ❌ Backend won't start
+- Ensure PostgreSQL is running and .env is configured correctly
+- Check Python and package versions
+
+### ❌ CORS or API errors
+- Verify NEXT_PUBLIC_API_URL in frontend .env.local
+- Check CORS_ALLOWED_ORIGINS in Django settings
+
+### ❌ OCR not working
+- Check OCR.space API key and network connection
+
+---
+
 ## 📄 License
 
-MIT License
+MIT License - Free to use and modify
