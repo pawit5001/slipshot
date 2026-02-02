@@ -20,7 +20,6 @@ pillow>=12.0.0
 easyocr>=1.7.0
 pytesseract>=0.3.10
 opencv-python-headless>=4.10.0
-pyzbar>=0.1.9
 
 # ML/Deep Learning (for EasyOCR)
 torch>=2.0.0

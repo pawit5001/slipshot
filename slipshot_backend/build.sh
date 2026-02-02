@@ -1,5 +1,5 @@
-# build.sh สำหรับ Render.com
 #!/usr/bin/env bash
+# build.sh สำหรับ Render.com
 set -o errexit
 
 pip install -r requirements.txt
