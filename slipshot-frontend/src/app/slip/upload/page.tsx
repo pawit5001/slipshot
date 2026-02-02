@@ -4,17 +4,16 @@ import { useRef, useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api, SessionExpiredError } from "@/lib/api";
-import { API_ENDPOINTS } from "@/lib/config";
+import { API_ENDPOINTS, getThaiDate, getThaiTime } from "@/lib/config";
 import { useModal } from "@/context/ModalContext";
 import { useDataCache } from "@/context/DataCacheContext";
 import { getUserSettings, setUserSettings } from "@/lib/cache";
 import type { OcrResponse, SlipFormData } from "@/lib/types";
 
 const getNow = () => {
-  const now = new Date();
   return {
-    date: now.toISOString().split("T")[0],
-    time: now.toTimeString().slice(0, 5),
+    date: getThaiDate(),
+    time: getThaiTime(),
   };
 };
 
@@ -142,8 +141,19 @@ export default function SlipUploadPage() {
       setSlips(prev => prev.map(slip => {
         if (slip.id !== slipId) return slip;
 
+        // ถ้าไม่ใช่ slip (status 400) ให้แสดง error และลบออก
         if (!res.ok) {
-          return { ...slip, ocrLoading: false, ocrError: res.error || "OCR ไม่สำเร็จ" };
+          // ถ้าเป็น error "ไม่พบข้อมูลสลิป" ให้ลบรูปออกพร้อมแจ้งเตือน
+          const errorMsg = res.error || "OCR ไม่สำเร็จ";
+          if (errorMsg.includes('ไม่พบข้อมูลสลิป') || errorMsg.includes('ไม่ใช่สลิป')) {
+            return { ...slip, ocrLoading: false, ocrError: "รูปนี้ไม่ใช่สลิปโอนเงิน กรุณาอัพโหลดรูปสลิปธนาคาร", ocrData: null };
+          }
+          return { ...slip, ocrLoading: false, ocrError: errorMsg };
+        }
+
+        // ตรวจสอบว่าเป็น valid slip หรือไม่
+        if (res.data?.is_valid_slip === false) {
+          return { ...slip, ocrLoading: false, ocrError: "รูปนี้ไม่ใช่สลิปโอนเงิน กรุณาอัพโหลดรูปสลิปธนาคาร", ocrData: null };
         }
 
         const extracted = res.data?.extracted;
@@ -276,6 +286,16 @@ export default function SlipUploadPage() {
     const slip = slips.find(s => s.id === slipId);
     if (!slip) return;
 
+    // Validate ก่อนบันทึก
+    if (!slip.form.account_name.trim()) {
+      await showAlert("กรุณากรอกชื่อรายการ", "error");
+      return;
+    }
+    if (!slip.form.amount || isNaN(Number(slip.form.amount)) || Number(slip.form.amount) <= 0) {
+      await showAlert("กรุณากรอกจำนวนเงินให้ถูกต้อง", "error");
+      return;
+    }
+
     setSlips(prev => prev.map(s => 
       s.id === slipId ? { ...s, saving: true, error: null } : s
     ));
@@ -294,9 +314,11 @@ export default function SlipUploadPage() {
       const res = await api.postForm(API_ENDPOINTS.SLIPS, formData);
 
       if (!res.ok) {
+        const errorMsg = res.error || "บันทึกไม่สำเร็จ";
         setSlips(prev => prev.map(s => 
-          s.id === slipId ? { ...s, saving: false, error: res.error || "บันทึกไม่สำเร็จ" } : s
+          s.id === slipId ? { ...s, saving: false, error: errorMsg } : s
         ));
+        await showAlert(errorMsg, "error");
         return;
       }
 
@@ -306,26 +328,50 @@ export default function SlipUploadPage() {
       invalidateSlips();
       invalidateDashboard();
     } catch (err) {
+      const errorMsg = err instanceof SessionExpiredError 
+        ? "Session หมดอายุ" 
+        : "เกิดข้อผิดพลาด";
       setSlips(prev => prev.map(s => 
         s.id === slipId ? { 
           ...s, 
           saving: false, 
-          error: err instanceof SessionExpiredError 
-            ? "Session หมดอายุ" 
-            : "เกิดข้อผิดพลาด" 
+          error: errorMsg
         } : s
       ));
+      await showAlert(errorMsg, "error");
     }
   };
 
   const saveAllSlips = async () => {
-    const unsavedSlips = slips.filter(s => !s.saved && !s.ocrLoading);
+    const unsavedSlips = slips.filter(s => !s.saved && !s.ocrLoading && !s.ocrError);
     if (unsavedSlips.length === 0) return;
 
     setSavingAll(true);
     setSavingProgress({ current: 0, total: unsavedSlips.length });
 
+    // Validate all slips before saving
+    const invalidSlips: string[] = [];
+    for (const unsavedSlip of unsavedSlips) {
+      const slip = slips.find(s => s.id === unsavedSlip.id);
+      if (!slip) continue;
+      
+      if (!slip.form.account_name.trim()) {
+        invalidSlips.push(`สลิป ${slips.indexOf(slip) + 1}: ไม่มีชื่อบัญชี`);
+      }
+      const amount = parseFloat(slip.form.amount);
+      if (isNaN(amount) || amount <= 0) {
+        invalidSlips.push(`สลิป ${slips.indexOf(slip) + 1}: จำนวนเงินไม่ถูกต้อง`);
+      }
+    }
+    
+    if (invalidSlips.length > 0) {
+      setSavingAll(false);
+      showAlert("error", "ข้อมูลไม่ครบ", invalidSlips.slice(0, 5).join("\n") + (invalidSlips.length > 5 ? `\n...และอีก ${invalidSlips.length - 5} รายการ` : ""));
+      return;
+    }
+
     let successCount = 0;
+    let failCount = 0;
     for (let i = 0; i < unsavedSlips.length; i++) {
       setSavingProgress({ current: i + 1, total: unsavedSlips.length });
       
@@ -360,6 +406,7 @@ export default function SlipUploadPage() {
           setSlips(prev => prev.map(s => 
             s.id === slipId ? { ...s, saving: false, error: res.error || "บันทึกไม่สำเร็จ" } : s
           ));
+          failCount++;
         }
       } catch (err) {
         setSlips(prev => prev.map(s => 
@@ -371,6 +418,7 @@ export default function SlipUploadPage() {
               : "เกิดข้อผิดพลาด" 
           } : s
         ));
+        failCount++;
       }
     }
 
@@ -378,7 +426,11 @@ export default function SlipUploadPage() {
     invalidateSlips();
     invalidateDashboard();
     
-    if (successCount > 0) {
+    if (failCount > 0 && successCount === 0) {
+      showAlert("error", "ไม่สำเร็จ", `บันทึกไม่สำเร็จ ${failCount} รายการ`);
+    } else if (failCount > 0) {
+      showAlert("warning", "บางส่วนไม่สำเร็จ", `บันทึกสำเร็จ ${successCount} รายการ, ไม่สำเร็จ ${failCount} รายการ`);
+    } else if (successCount > 0) {
       showAlert("success", "สำเร็จ", `บันทึก ${successCount} รายการเรียบร้อย`);
       // Redirect to slip list page after saving
       router.push("/slip");
@@ -407,9 +459,21 @@ export default function SlipUploadPage() {
     }
   };
 
-  const unsavedCount = slips.filter(s => !s.saved && !s.ocrLoading).length;
+  const unsavedCount = slips.filter(s => !s.saved && !s.ocrLoading && !s.ocrError).length;
   const savedCount = slips.filter(s => s.saved).length;
   const loadingCount = slips.filter(s => s.ocrLoading).length;
+  const errorCount = slips.filter(s => s.ocrError).length;
+
+  const removeInvalidSlips = async () => {
+    const invalidSlips = slips.filter(s => s.ocrError);
+    if (invalidSlips.length === 0) return;
+    
+    const confirmed = await showConfirm("warning", "ยืนยัน", `ต้องการลบ ${invalidSlips.length} รูปที่ไม่ใช่สลิปหรือไม่?`);
+    if (confirmed) {
+      invalidSlips.forEach(slip => URL.revokeObjectURL(slip.preview));
+      setSlips(prev => prev.filter(s => !s.ocrError));
+    }
+  };
 
   return (
     <div className="max-w-6xl mx-auto p-4 sm:p-6">
@@ -544,6 +608,11 @@ export default function SlipUploadPage() {
                 กำลังอ่าน: <span className="font-medium">{loadingCount}</span>
               </span>
             )}
+            {errorCount > 0 && (
+              <span className="text-red-600">
+                ไม่ใช่สลิป: <span className="font-medium">{errorCount}</span>
+              </span>
+            )}
             {unsavedCount > 0 && (
               <span className="text-amber-600">
                 รอบันทึก: <span className="font-medium">{unsavedCount}</span>
@@ -557,6 +626,15 @@ export default function SlipUploadPage() {
           </div>
           
           <div className="flex gap-2">
+            {errorCount > 0 && (
+              <button
+                type="button"
+                onClick={removeInvalidSlips}
+                className="px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition"
+              >
+                ลบรูปไม่ใช่สลิป ({errorCount})
+              </button>
+            )}
             <button
               type="button"
               onClick={clearAllSlips}
@@ -590,13 +668,19 @@ export default function SlipUploadPage() {
             className={`bg-white dark:bg-zinc-900 rounded-xl border overflow-hidden transition-all ${
               slip.saved 
                 ? "border-emerald-300 dark:border-emerald-700" 
-                : slip.error 
-                  ? "border-red-300 dark:border-red-700"
-                  : "border-zinc-200 dark:border-zinc-800"
+                : slip.ocrError
+                  ? "border-red-300 dark:border-red-700 bg-red-50/50 dark:bg-red-900/10"
+                  : slip.error 
+                    ? "border-red-300 dark:border-red-700"
+                    : "border-zinc-200 dark:border-zinc-800"
             }`}
           >
             {/* Card Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50">
+            <div className={`flex items-center justify-between px-4 py-3 border-b ${
+              slip.ocrError 
+                ? "border-red-200 dark:border-red-800 bg-red-100 dark:bg-red-900/30" 
+                : "border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50"
+            }`}>
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
                   #{index + 1}
@@ -608,6 +692,14 @@ export default function SlipUploadPage() {
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                     </svg>
                     กำลังอ่าน...
+                  </span>
+                )}
+                {slip.ocrError && (
+                  <span className="flex items-center gap-1 text-xs text-red-600 font-medium">
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    ไม่ใช่สลิป
                   </span>
                 )}
                 {slip.saved && (

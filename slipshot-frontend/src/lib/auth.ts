@@ -16,7 +16,8 @@ export type AuthErrorCode =
   | 'REFRESH_TOKEN_REVOKED'
   | 'REFRESH_TOKEN_INVALID'
   | 'SESSION_EXPIRED'
-  | 'NETWORK_ERROR';
+  | 'NETWORK_ERROR'
+  | 'RATE_LIMITED';
 
 export class AuthError extends Error {
   code: AuthErrorCode;
@@ -172,6 +173,9 @@ class AuthService {
    * Get error code from response
    */
   private getErrorCode(status: number, errorMessage?: string): AuthErrorCode {
+    if (status === 429) {
+      return 'RATE_LIMITED';
+    }
     if (errorMessage?.toLowerCase().includes('expired')) {
       return 'REFRESH_TOKEN_EXPIRED';
     }
@@ -192,6 +196,7 @@ class AuthService {
       'REFRESH_TOKEN_EXPIRED',
       'REFRESH_TOKEN_REVOKED',
       'REFRESH_TOKEN_MISSING',
+      'RATE_LIMITED',
     ].includes(code);
   }
 

@@ -7,10 +7,13 @@ from rest_framework.decorators import action
 from django.contrib.auth.models import User
 from django.db.models import Sum, Q, Max
 from django.http import HttpResponse
+from django.conf import settings
 from .models import Slip, Tag
 from .serializers import SlipSerializer, TagSerializer, UserRegisterSerializer
-import easyocr
 from PIL import Image
+import requests as http_requests
+import base64
+import io
 import json
 import re
 from datetime import datetime
@@ -142,32 +145,117 @@ class SlipViewSet(viewsets.ModelViewSet):
 			queryset = queryset.filter(type=slip_type)
 		return queryset.order_by('-date')
 
-	def perform_create(self, serializer):
-		slip = serializer.save(user=self.request.user)
+	def create(self, request, *args, **kwargs):
+		# Debug: Print incoming data
+		print("=== SLIP CREATE DEBUG ===")
+		print("Request data:", request.data)
+		print("Request FILES:", request.FILES)
+		
+		serializer = self.get_serializer(data=request.data)
+		if not serializer.is_valid():
+			print("Validation errors:", serializer.errors)
+			return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+		
+		slip = serializer.save(user=request.user)
+		
 		# Logic: ถ้า account_name ตรงกับชื่อ-นามสกุล user ให้เป็นรายรับ
-		user = self.request.user
+		user = request.user
 		user_fullname = f"{user.first_name} {user.last_name}".strip().lower()
 		if slip.account_name and slip.account_name.strip().lower() == user_fullname:
 			slip.type = "income"
 			slip.save(update_fields=["type"])
-		return slip
+		
+		headers = self.get_success_headers(serializer.data)
+		return Response(SlipSerializer(slip).data, status=status.HTTP_201_CREATED, headers=headers)
 
 	@action(detail=False, methods=['post'], url_path='ocr', parser_classes=[MultiPartParser, FormParser])
 	def ocr(self, request):
 		image = request.FILES.get('image')
 		if not image:
 			return Response({'error': 'No image provided'}, status=400)
-		img = Image.open(image)
-		# EasyOCR expects a file path or numpy array
-		import numpy as np
-		img_np = np.array(img)
-		reader = easyocr.Reader(['th', 'en'], gpu=False)
-		result = reader.readtext(img_np, detail=0, paragraph=True)
-		text = '\n'.join(result)
+		
+		# Use OCR.space API (Free: 25,000 requests/month)
+		text = ""
+		ocr_available = True
+		
+		try:
+			# Read image and convert to base64
+			image_data = image.read()
+			base64_image = base64.b64encode(image_data).decode('utf-8')
+			
+			# Get API key from settings or use free tier key
+			api_key = getattr(settings, 'OCR_SPACE_API_KEY', 'K85695728488957')  # Free API key
+			
+			# Call OCR.space API
+			payload = {
+				'base64Image': f'data:image/jpeg;base64,{base64_image}',
+				'language': 'tha',  # Thai language
+				'isOverlayRequired': False,
+				'detectOrientation': True,
+				'scale': True,
+				'OCREngine': 2,  # Engine 2 is better for Thai
+			}
+			
+			response = http_requests.post(
+				'https://api.ocr.space/parse/image',
+				data=payload,
+				headers={'apikey': api_key},
+				timeout=30
+			)
+			
+			if response.status_code == 200:
+				result = response.json()
+				if result.get('ParsedResults') and len(result['ParsedResults']) > 0:
+					text = result['ParsedResults'][0].get('ParsedText', '')
+					print(f"OCR.space result: {text[:200]}...")  # Debug log
+				else:
+					error_msg = result.get('ErrorMessage', 'Unknown error')
+					print(f"OCR.space error: {error_msg}")
+					ocr_available = False
+			else:
+				print(f"OCR.space HTTP error: {response.status_code}")
+				ocr_available = False
+				
+		except Exception as e:
+			print(f"OCR error: {str(e)}")
+			ocr_available = False
+			text = ""
 		
 		import re
 		from datetime import datetime
 		from difflib import SequenceMatcher
+		
+		# === ตรวจสอบว่าเป็น slip ธนาคารจริงหรือไม่ ===
+		slip_keywords = [
+			# Keywords ที่บ่งบอกว่าเป็น slip
+			'โอนเงิน', 'เติมเงิน', 'ชำระ', 'รับเงิน', 'ถอนเงิน',
+			'สำเร็จ', 'successful', 'transfer', 'payment',
+			'พร้อมเพย์', 'promptpay', 'prompt pay',
+			'ธนาคาร', 'bank', 'scb', 'kbank', 'ktb', 'bbl', 'tmb', 'ttb', 'gsb', 'bay',
+			'กสิกร', 'ไทยพาณิชย์', 'กรุงเทพ', 'กรุงไทย', 'กรุงศรี', 'ออมสิน', 'ทหารไทย',
+			'บาท', 'thb', '฿',
+			'เลขที่รายการ', 'รหัสอ้างอิง', 'reference', 'ref',
+			'ผู้โอน', 'ผู้รับ', 'จาก', 'ไปยัง', 'to', 'from',
+			'บัญชี', 'account', 'xxx-', 'x-x',
+			'ค่าธรรมเนียม', 'fee',
+			'wallet', 'e-wallet', 'true money', 'truemoney',
+		]
+		
+		text_lower = text.lower()
+		slip_keyword_count = sum(1 for kw in slip_keywords if kw.lower() in text_lower)
+		
+		# ต้องมีอย่างน้อย 3 keywords ที่บ่งบอกว่าเป็น slip
+		is_likely_slip = slip_keyword_count >= 3
+		
+		# ถ้าไม่ใช่ slip ให้ return error ทันที
+		if not is_likely_slip:
+			return Response({
+				'error': 'ไม่พบข้อมูลสลิปโอนเงินในรูปภาพ',
+				'is_valid_slip': False,
+				'text': text,
+				'slip_keyword_count': slip_keyword_count,
+				'extracted': None,
+			}, status=400)
 		
 		# --- Post-processing: แก้ OCR errors ที่พบบ่อย ---
 		def fix_ocr_common(text):
@@ -340,10 +428,56 @@ class SlipViewSet(viewsets.ModelViewSet):
 				except:
 					pass
 
-		# --- Enhanced กำหนด transaction type ---
+		# === ดึงชื่อผู้รับ (Receiver) แยกจากชื่อผู้โอน (Sender) ===
+		# === Pattern สำหรับ "โอนเงินให้ [ชื่อ]" - ชื่อคือผู้รับ ===
+		transfer_to_pattern = r'โอนเงินให้\s*(?:นาย|นาง|นางสาว|น\.ส\.|Mr\.|Mrs\.|Ms\.)?\s*([ก-๙a-zA-Z]+\s*[ก-๙a-zA-Z]*\.?)'
+		
+		receiver_patterns = [
+			transfer_to_pattern,  # "โอนเงินให้ นาย ปวิช" → ปวิช เป็นผู้รับ
+			r'(?:ผู้รับ|To|ไปยัง|ชื่อผู้รับ|Recipient|บัญชีปลายทาง|ผู้รับเงิน|ปลายทาง|บัญชีผู้รับ|โอนให้|โอนไปยัง|ไปบัญชี)[\s\n:]+(?:นาย|นาง|นางสาว|น\.ส\.|Mr\.|Mrs\.|Ms\.)?\s*([ก-๙a-zA-Z]+\s*[ก-๙a-zA-Z]*\.?)',
+			r'(?:พร้อมเพย์|PromptPay)[\s\n:]+(?:นาย|นาง|นางสาว|น\.ส\.|Mr\.|Mrs\.|Ms\.)?\s*([ก-๙a-zA-Z]+\s*[ก-๙a-zA-Z]*\.?)',
+		]
+		sender_patterns = [
+			r'(?:ผู้โอน|From|จาก|ชื่อผู้โอน|Sender|รับเงินจาก|โอนจาก|Transfer\s*from|ได้รับจาก|เงินจาก)[\s\n:]+(?:นาย|นาง|นางสาว|น\.ส\.|Mr\.|Mrs\.|Ms\.)?\s*([ก-๙a-zA-Z]+\s*[ก-๙a-zA-Z]*\.?)',
+		]
+		
+		def clean_name(n):
+			if not n: return ''
+			n = n.strip()
+			n = re.sub(r'^(นาย|นาง|นางสาว|น\.ส\.|Mr\.|Mrs\.|Ms\.)\s*', '', n, flags=re.IGNORECASE)
+			return ' '.join(n.split())
+		
+		def is_valid_name(n):
+			if not n or len(n) < 2: return False
+			if re.match(r'^[\d\s.,]+$', n): return False
+			exclude = ['โอนเงิน', 'สำเร็จ', 'บาท', 'รายการ', 'ธนาคาร', 'บัญชี', 'เลขที่', 'หมายเหตุ', 'วันที่', 'เวลา', 'จำนวน']
+			return not any(w in n for w in exclude)
+		
+		# ดึงชื่อผู้รับ
+		found_receivers = []
+		for pattern in receiver_patterns:
+			for m in re.findall(pattern, text, re.IGNORECASE | re.MULTILINE):
+				name = clean_name(m)
+				if is_valid_name(name) and name not in found_receivers:
+					found_receivers.append(name)
+		
+		# ดึงชื่อผู้โอน/ผู้ส่ง (รวม pattern "จาก")
+		found_senders = []
+		for pattern in sender_patterns:
+			for m in re.findall(pattern, text, re.IGNORECASE | re.MULTILINE):
+				name = clean_name(m)
+				if is_valid_name(name) and name not in found_senders:
+					found_senders.append(name)
+
+		# === ตรวจ keyword พิเศษที่ช่วยระบุประเภทได้ชัด ===
+		is_topup = bool(re.search(r'เติมเงิน(สำเร็จ)?', text))  # เติมเงินสำเร็จ = มีคนเติมให้เรา
+		is_receive = bool(re.search(r'(รับเงิน|ได้รับ|เงินเข้า)', text))
+
+		# --- กำหนด transaction type จาก Keywords (ใช้เป็น fallback เท่านั้น) ---
+		# ไม่ใช้ keyword เป็นหลักเพราะ "โอนเงินให้" อาจเป็นรายรับถ้าผู้รับคือเรา
 		type_keywords = {
-			'income': ['รับเงิน', 'รับโอน', 'เงินเข้า', 'Received', 'ได้รับ', 'Income', 'เข้าบัญชี', 'Deposit', 'รับจาก', 'โอนมา', 'รับ'],
-			'expense': ['โอนเงิน', 'จ่ายเงิน', 'ชำระ', 'Payment', 'Transfer', 'Paid', 'ถอน', 'โอนไป', 'ออกจากบัญชี', 'Withdrawal', 'โอนให้', 'จ่าย', 'ชำระเงิน'],
+			'income': ['รับเงิน', 'รับโอน', 'เงินเข้า', 'Received', 'ได้รับ', 'Income', 'เข้าบัญชี', 'Deposit', 'รับจาก'],
+			'expense': ['จ่ายเงิน', 'ชำระ', 'Payment', 'Paid', 'ถอน', 'ออกจากบัญชี', 'Withdrawal', 'จ่าย', 'ชำระเงิน'],
 		}
 		detected_type = None
 		type_confidence = 'unknown'
@@ -357,7 +491,7 @@ class SlipViewSet(viewsets.ModelViewSet):
 			if detected_type:
 				break
 
-		# --- Enhanced เปรียบเทียบชื่อกับ user ---
+		# --- เปรียบเทียบชื่อกับ user เพื่อระบุประเภท ---
 		user = request.user if request.user.is_authenticated else None
 		user_fullname = None
 		user_firstname = None
@@ -366,140 +500,154 @@ class SlipViewSet(viewsets.ModelViewSet):
 		match_detail = None
 		match_confidence = None
 		suggested_type = detected_type or 'expense'
-		suggested_account_name = found_names[0] if found_names else ''
+		suggested_account_name = ''
+		receiver_name = found_receivers[0] if found_receivers else ''
+		sender_name = found_senders[0] if found_senders else ''
 		
 		def normalize(s):
-			"""Normalize string for comparison"""
-			if not s:
-				return ''
-			# Remove periods, extra spaces, common prefixes
+			if not s: return ''
 			s = s.replace('.', '').strip()
 			s = re.sub(r'^(นาย|นาง|นางสาว|น\.?ส\.?|Mr|Mrs|Ms)\.?\s*', '', s, flags=re.IGNORECASE)
 			return ' '.join(s.lower().split())
 		
-		def strip_abbreviation(s):
-			"""Clean abbreviation markers like . or spaces at end"""
-			if not s:
-				return ''
-			return s.rstrip('.').strip()
-		
 		def similarity_ratio(s1, s2):
-			"""Calculate similarity ratio between two strings"""
 			return SequenceMatcher(None, s1, s2).ratio()
 		
-		def match_name_advanced(slip_name, user_first, user_last):
+		def check_name_match(slip_name, user_first, user_last):
 			"""
-			Advanced name matching with fuzzy matching support:
-			- Full match: ชื่อ นามสกุล ตรงทั้งหมด
-			- Partial match: ชื่อตรง + นามสกุลใกล้เคียง
-			- Fuzzy match: คล้ายกัน >= 80%
-			Returns: (is_match, confidence, detail)
+			ตรวจสอบว่าชื่อตรงกับ user หรือไม่ และเป็นชื่อเต็มหรือย่อ
+			Returns: (is_match, is_full_name)
+			- is_match: ชื่อตรงกับ user หรือไม่
+			- is_full_name: เป็นชื่อเต็ม (ชื่อ + นามสกุลเต็ม) หรือไม่
 			"""
+			if not slip_name or not user_first:
+				return (False, False)
+			
 			slip_norm = normalize(slip_name)
 			user_first_norm = normalize(user_first)
-			user_last_norm = normalize(user_last)
-			user_full_norm = f"{user_first_norm} {user_last_norm}"
-			
-			if not slip_norm:
-				return (False, 'none', 'ไม่พบชื่อใน slip')
+			user_last_norm = normalize(user_last) if user_last else ''
+			user_full_norm = f"{user_first_norm} {user_last_norm}".strip()
 			
 			slip_parts = slip_norm.split()
 			if not slip_parts:
-				return (False, 'none', 'ไม่พบชื่อใน slip')
+				return (False, False)
 			
 			slip_first = slip_parts[0]
 			slip_last = slip_parts[1] if len(slip_parts) > 1 else ''
 			
-			# Case 1: Full exact match
+			# Case 1: Full exact match = ชื่อเต็ม
 			if slip_norm == user_full_norm:
-				return (True, 'full', f'ชื่อ-นามสกุลตรงกันทั้งหมด: {slip_name}')
+				return (True, True)
 			
-			# Case 2: High similarity match (>= 85%)
-			full_similarity = similarity_ratio(slip_norm, user_full_norm)
-			if full_similarity >= 0.85:
-				return (True, 'fuzzy_full', f'ชื่อ-นามสกุลใกล้เคียงมาก ({int(full_similarity*100)}%): {slip_name}')
+			# Case 2: High similarity (>= 85%) = ชื่อเต็ม
+			if similarity_ratio(slip_norm, user_full_norm) >= 0.85:
+				return (True, True)
 			
-			# Case 3: First name exact match
+			# Case 3: First name exact + last name full = ชื่อเต็ม
+			if slip_first == user_first_norm and slip_last == user_last_norm:
+				return (True, True)
+			
+			# Case 4: First name match + last name abbreviated (1-2 chars) = ชื่อย่อ
 			if slip_first == user_first_norm:
 				if not slip_last:
-					return (True, 'first_only', f'ชื่อตรง (ไม่มีนามสกุลใน slip): {slip_name}')
-				# Handle short abbreviation (1-2 chars) like "ว" or "วี" for "วีรคุปต์"
-				elif len(slip_last) <= 2 and user_last_norm.startswith(slip_last):
-					return (True, 'abbreviated', f'ชื่อตรง นามสกุลย่อ: {slip_name}')
-				elif user_last_norm.startswith(slip_last):
-					return (True, 'abbreviated', f'ชื่อตรง นามสกุลย่อ: {slip_name}')
-				elif slip_last.startswith(user_last_norm[:3]) if len(user_last_norm) >= 3 else False:
-					return (True, 'partial', f'ชื่อตรง นามสกุลใกล้เคียง: {slip_name}')
-				else:
-					# Last name similarity check
-					last_similarity = similarity_ratio(slip_last, user_last_norm)
-					if last_similarity >= 0.7:
-						return (True, 'partial', f'ชื่อตรง นามสกุลใกล้เคียง ({int(last_similarity*100)}%): {slip_name}')
-					# Allow if slip_last is very short (could be abbreviation)
-					if len(slip_last) <= 2:
-						return (True, 'abbreviated', f'ชื่อตรง นามสกุลอาจย่อ: {slip_name}')
-					return (False, 'first_only_different_last', f'ชื่อตรงแต่นามสกุลต่างกัน: {slip_name} vs {user_last}')
+					return (True, False)  # มีแค่ชื่อ ไม่มีนามสกุล = ย่อ
+				if len(slip_last) <= 2:
+					return (True, False)  # นามสกุลย่อ เช่น "ว" หรือ "วี"
+				if user_last_norm and slip_last != user_last_norm:
+					# นามสกุลไม่ตรงเต็ม เช็คว่าย่อหรือเปล่า
+					if user_last_norm.startswith(slip_last) or slip_last.endswith('.'):
+						return (True, False)  # นามสกุลย่อ
+					# ถ้า similarity สูงพอก็ถือว่าเต็ม
+					if similarity_ratio(slip_last, user_last_norm) >= 0.8:
+						return (True, True)
+					return (True, False)  # ไม่แน่ใจ ถือว่าย่อ
+				return (True, True)  # นามสกุลเต็ม
 			
-			# Case 4: First name similarity check
-			first_similarity = similarity_ratio(slip_first, user_first_norm)
-			if first_similarity >= 0.8:
-				if not slip_last:
-					return (True, 'fuzzy_first', f'ชื่อใกล้เคียง ({int(first_similarity*100)}%): {slip_name}')
-				last_similarity = similarity_ratio(slip_last, user_last_norm) if slip_last else 0
-				if last_similarity >= 0.6:
-					return (True, 'fuzzy_both', f'ชื่อ-นามสกุลใกล้เคียง: {slip_name}')
-			
-			# Case 5: Check if first name starts with slip name
+			# Case 5: First name starts with = ชื่อย่อ
 			if user_first_norm.startswith(slip_first) and len(slip_first) >= 2:
-				return (True, 'name_abbreviated', f'ชื่อย่อตรง: {slip_name}')
+				return (True, False)
 			
-			return (False, 'no_match', f'ไม่ตรงกัน: {slip_name}')
+			return (False, False)
 		
 		if user:
 			user_firstname = user.first_name
 			user_lastname = user.last_name
 			user_fullname = f"{user_firstname} {user_lastname}".strip()
 			
-			# หาชื่อที่ตรงกับ user
-			best_match = None
-			best_confidence = 'none'
-			confidence_priority = ['full', 'fuzzy_full', 'abbreviated', 'partial', 'first_only', 'fuzzy_first', 'fuzzy_both', 'name_abbreviated']
+			# === Logic ใหม่: ดูจากชื่อเต็ม/ย่อ ===
+			# - ชื่อเราเต็ม = เขาโอนให้เรา = รายรับ
+			# - ชื่อเราย่อ = เราโอนให้เขา = รายจ่าย (ชื่อผู้รับจะเต็ม)
 			
-			for found in found_names:
-				is_match, confidence, detail = match_name_advanced(found, user_firstname, user_lastname)
+			# หาชื่อที่ตรงกับ user จากทุก field
+			all_names = []
+			for name in found_receivers:
+				is_match, is_full = check_name_match(name, user_firstname, user_lastname)
 				if is_match:
-					# Check if this match is better than previous
-					if best_match is None or (confidence in confidence_priority and 
-						confidence_priority.index(confidence) < confidence_priority.index(best_confidence)):
-						best_match = found
-						best_confidence = confidence
-						match_detail = detail
+					all_names.append({'name': name, 'is_full': is_full, 'source': 'receiver'})
+			for name in found_senders:
+				is_match, is_full = check_name_match(name, user_firstname, user_lastname)
+				if is_match:
+					all_names.append({'name': name, 'is_full': is_full, 'source': 'sender'})
+			for name in found_names:
+				is_match, is_full = check_name_match(name, user_firstname, user_lastname)
+				if is_match:
+					all_names.append({'name': name, 'is_full': is_full, 'source': 'general'})
 			
-			if best_match:
-				match_status = True
-				match_confidence = best_confidence
-				# ถ้าชื่อตรงกับ user = น่าจะเป็นรายรับ (เงินเข้า)
-				if detected_type is None:
+			if all_names:
+				# หาชื่อที่เป็น full name ก่อน
+				full_name_match = next((n for n in all_names if n['is_full']), None)
+				any_match = all_names[0]
+				
+				if full_name_match:
+					# พบชื่อเราแบบเต็ม = เขาโอนให้เรา = รายรับ
 					suggested_type = 'income'
-					type_confidence = 'name_match'
-				# Use user's full name as account name (cleaner)
-				suggested_account_name = user_fullname
+					type_confidence = 'full_name_match'
+					match_status = True
+					match_detail = f'พบชื่อเต็ม: {full_name_match["name"]} (รายรับ)'
+					# account_name = ชื่อคนที่โอนให้เรา (ถ้าหาได้)
+					other_names = [n for n in found_names + found_senders + found_receivers 
+								   if not check_name_match(n, user_firstname, user_lastname)[0]]
+					suggested_account_name = other_names[0] if other_names else user_fullname
+				else:
+					# พบชื่อเราแบบย่อ = เราโอนให้เขา = รายจ่าย
+					suggested_type = 'expense'
+					type_confidence = 'abbreviated_name_match'
+					match_status = True
+					match_detail = f'พบชื่อย่อ: {any_match["name"]} (รายจ่าย)'
+					# account_name = ชื่อผู้รับ (คนที่เราโอนให้)
+					other_names = [n for n in found_names + found_receivers 
+								   if not check_name_match(n, user_firstname, user_lastname)[0]]
+					suggested_account_name = other_names[0] if other_names else receiver_name
 			else:
+				# === ไม่พบชื่อเราในสลิปเลย = ไม่สามารถระบุได้แน่นอน ===
+				# Default เป็น expense แต่ให้ warning ให้ user ตรวจสอบ
 				match_status = False
 				match_confidence = 'no_match'
-				if not match_detail:
-					match_detail = f"ไม่พบชื่อตรงกับผู้ใช้ ({user_fullname})"
-				# ถ้าไม่ตรง = น่าจะเป็นรายจ่าย
-				if detected_type is None:
-					suggested_type = 'expense'
-					type_confidence = 'name_no_match'
+				
+				# หา account_name จากชื่อที่พบ
+				if sender_name:
+					suggested_account_name = sender_name
+					match_detail = f'พบผู้โอน: {sender_name} (ไม่พบชื่อผู้ใช้)'
+				elif receiver_name:
+					suggested_account_name = receiver_name
+					match_detail = f'พบผู้รับ: {receiver_name} (ไม่พบชื่อผู้ใช้)'
+				elif found_names:
+					suggested_account_name = found_names[0]
+					match_detail = f'พบชื่อ: {found_names[0]} (ไม่พบชื่อผู้ใช้)'
+				else:
+					suggested_account_name = ''
+					match_detail = 'ไม่พบชื่อในสลิป'
+				
+				# Default type = expense แต่ confidence ต่ำ
+				suggested_type = 'expense'
+				type_confidence = 'uncertain'
 		
 		# สร้าง warning ถ้าไม่สามารถระบุประเภทได้แน่นอน
 		type_warning = None
 		is_valid_slip = True
 		
 		# ตรวจสอบว่าเป็น slip หรือไม่
-		if not found_amount and not found_names:
+		if not found_amount and not found_names and not found_receivers and not found_senders:
 			type_warning = 'ไม่พบข้อมูลสลิป อาจไม่ใช่รูปสลิปโอนเงิน'
 			is_valid_slip = False
 			suggested_type = None  # ไม่ระบุประเภทเมื่อไม่ใช่ slip
@@ -507,14 +655,16 @@ class SlipViewSet(viewsets.ModelViewSet):
 			type_warning = 'ไม่พบจำนวนเงินในรูป กรุณากรอกข้อมูลเอง'
 			is_valid_slip = False
 			suggested_type = None  # ไม่ระบุประเภทเมื่อไม่พบจำนวนเงิน
-		elif not found_names:
-			type_warning = 'ไม่พบชื่อบัญชีในรูป กรุณากรอกข้อมูลเอง'
-		elif type_confidence in ['unknown', 'name_match', 'name_no_match']:
-			type_warning = 'ไม่สามารถระบุประเภทได้แน่นอน กรุณาตรวจสอบอีกครั้ง'
+		elif type_confidence == 'uncertain':
+			type_warning = 'ไม่พบชื่อผู้ใช้ในสลิป กรุณาเลือกประเภทรายการเอง'
+		elif not match_status:
+			type_warning = 'ไม่พบชื่อผู้ใช้ในสลิป กรุณาตรวจสอบประเภทรายการ'
 
 		return Response({
 			'text': text,
 			'found_names': found_names,
+			'found_receivers': found_receivers,  # ชื่อผู้รับที่พบ
+			'found_senders': found_senders,  # ชื่อผู้โอนที่พบ
 			'user_fullname': user_fullname,
 			'match': match_status,
 			'match_detail': match_detail,
@@ -523,6 +673,8 @@ class SlipViewSet(viewsets.ModelViewSet):
 			# ข้อมูลที่ดึงได้
 			'extracted': {
 				'account_name': suggested_account_name,
+				'receiver_name': receiver_name,  # ชื่อผู้รับ
+				'sender_name': sender_name,  # ชื่อผู้โอน
 				'transaction_title': self.extract_transaction_title(text),  # หัวข้อรายการ
 				'amount': found_amount,
 				'date': found_date or datetime.now().strftime('%Y-%m-%d'),

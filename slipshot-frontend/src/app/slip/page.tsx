@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { api, SessionExpiredError } from "@/lib/api";
-import { API_ENDPOINTS, getSlipUrl } from "@/lib/config";
+import { API_ENDPOINTS, getSlipUrl, getThaiDate, getThaiTime } from "@/lib/config";
 import { useModal } from "@/context/ModalContext";
 import { useDataCache } from "@/context/DataCacheContext";
 import { saveFormData, loadFormData, clearFormData } from "@/lib/formPersistence";
@@ -14,8 +14,8 @@ const FORM_ID = "slip_form";
 const getInitialForm = (): SlipFormData => ({
   account_name: "",
   amount: "",
-  date: new Date().toISOString().split("T")[0],
-  time: new Date().toTimeString().slice(0, 5),
+  date: getThaiDate(),
+  time: getThaiTime(),
   tag_id: "",
   type: "expense",
   note: "",
@@ -281,8 +281,8 @@ export default function SlipManager() {
     const initialForm = getInitialForm();
     setForm({
       ...initialForm,
-      date: new Date().toISOString().split("T")[0],
-      time: new Date().toTimeString().slice(0, 5),
+      date: getThaiDate(),
+      time: getThaiTime(),
       tag_id: tags.find(t => t.name === "ไม่ระบุ")?.id.toString() || tags[0]?.id.toString() || "",
       note: "",
     });

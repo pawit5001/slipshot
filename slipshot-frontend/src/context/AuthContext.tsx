@@ -1,28 +1,59 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode, useRef } from "react";
 import { api, SessionExpiredError } from "@/lib/api";
 import { API_ENDPOINTS } from "@/lib/config";
+import { authService } from "@/lib/auth";
 import type { User } from "@/lib/types";
 
 interface AuthContextType {
   user: User | null;
   isLoggedIn: boolean;
   loading: boolean;
-  refreshUser: () => Promise<void>;
+  refreshUser: (force?: boolean) => Promise<void>;
   logout: () => Promise<void>;
   setUser: (user: User | null) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Public paths that don't require authentication
+const PUBLIC_PATHS = ['/auth/login', '/auth/register', '/'];
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loading, setLoading] = useState(true);
   const [initialized, setInitialized] = useState(false);
+  const isRefreshingRef = useRef(false);
 
-  const refreshUser = useCallback(async () => {
+  const refreshUser = useCallback(async (force = false) => {
+    // Prevent multiple simultaneous refresh calls
+    if (isRefreshingRef.current) {
+      return;
+    }
+
+    // Skip auth check on public paths (unless forced)
+    if (!force && typeof window !== 'undefined') {
+      const pathname = window.location.pathname;
+      if (PUBLIC_PATHS.includes(pathname)) {
+        setLoading(false);
+        setInitialized(true);
+        return;
+      }
+    }
+
+    // Check if session is already marked as expired (unless forced)
+    if (!force && !authService.isSessionValid()) {
+      setUser(null);
+      setIsLoggedIn(false);
+      setLoading(false);
+      setInitialized(true);
+      return;
+    }
+
+    isRefreshingRef.current = true;
+    
     try {
       const res = await api.get<User>(API_ENDPOINTS.USER_PROFILE);
       if (res.ok && res.data) {
@@ -43,6 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
       setInitialized(true);
+      isRefreshingRef.current = false;
     }
   }, []);
 
@@ -52,6 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setUser(null);
       setIsLoggedIn(false);
+      authService.reset();
     }
   }, []);
 

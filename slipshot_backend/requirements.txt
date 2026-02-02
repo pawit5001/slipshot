@@ -18,20 +18,9 @@ python-dotenv>=1.2.0
 # Timezone
 pytz>=2024.1
 
-# Image Processing & OCR
+# Image Processing (OCR via cloud API - no local dependencies)
 pillow>=12.0.0
-easyocr>=1.7.0
-pytesseract>=0.3.10
-opencv-python-headless>=4.10.0
-
-# ML/Deep Learning (for EasyOCR)
-torch>=2.0.0
-torchvision>=0.15.0
-
-# Scientific Computing
-numpy>=2.0.0
-scipy>=1.14.0
-scikit-image>=0.24.0
+requests>=2.31.0
 
 # Other
 PyYAML>=6.0.0

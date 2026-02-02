@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import { api, SessionExpiredError } from "@/lib/api";
-import { API_ENDPOINTS, API_BASE_URL } from "@/lib/config";
+import { API_ENDPOINTS, API_BASE_URL, getThaiDate, getThaiYear, getThaiMonth, THAILAND_TIMEZONE } from "@/lib/config";
 import type { DashboardData, TagBreakdown, DailyTrend, RecentSlip } from "@/lib/types";
 
 type PeriodType = "day" | "week" | "month" | "year";
@@ -21,6 +21,7 @@ interface LeaderboardData {
   recent_active: LeaderboardUser[];
   my_rank: number;
   my_slip_count: number;
+  my_user_data: LeaderboardUser | null;
 }
 
 // Helper: get Monday of current week
@@ -48,10 +49,7 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardData | null>(null);
   const [periodType, setPeriodType] = useState<PeriodType>("day");
-  const [periodValue, setPeriodValue] = useState(() => {
-    const d = new Date();
-    return d.toISOString().split("T")[0]; // Default to today
-  });
+  const [periodValue, setPeriodValue] = useState(() => getThaiDate());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   
@@ -60,19 +58,21 @@ export default function DashboardPage() {
 
   const handlePeriodTypeChange = (newType: PeriodType) => {
     setPeriodType(newType);
-    const d = new Date();
     switch (newType) {
       case "day":
-        setPeriodValue(d.toISOString().split("T")[0]);
+        setPeriodValue(getThaiDate());
         break;
       case "week":
-        setPeriodValue(getMonday(new Date()).toISOString().split("T")[0]);
+        // Get Monday of current week in Thailand timezone
+        const now = new Date();
+        const thaiNow = new Date(now.toLocaleString('en-US', { timeZone: THAILAND_TIMEZONE }));
+        setPeriodValue(getMonday(thaiNow).toISOString().split("T")[0]);
         break;
       case "month":
-        setPeriodValue(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+        setPeriodValue(`${getThaiYear()}-${String(getThaiMonth()).padStart(2, "0")}`);
         break;
       case "year":
-        setPeriodValue(d.getFullYear().toString());
+        setPeriodValue(getThaiYear().toString());
         break;
     }
   };
@@ -549,9 +549,9 @@ export default function DashboardPage() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span className="text-blue-600 dark:text-blue-400">คุณอยู่อันดับที่</span>
-                        <span className="text-xl font-bold text-blue-600 dark:text-blue-400">#{leaderboard.my_rank}</span>
+                        <span className="text-xl font-bold text-blue-600 dark:text-blue-400">{leaderboard.my_rank}</span>
                       </div>
-                      <span className="text-sm text-blue-600 dark:text-blue-400">{leaderboard.my_slip_count} slips</span>
+                      <span className="text-sm text-blue-600 dark:text-blue-400">{leaderboard.my_slip_count} รายการ</span>
                     </div>
                   </div>
                 )}
@@ -579,7 +579,7 @@ export default function DashboardPage() {
                           <p className={`font-medium truncate ${user.is_me ? 'text-blue-700 dark:text-blue-300' : 'text-zinc-900 dark:text-white'}`}>
                             {user.display_name} {user.is_me && <span className="text-xs">(คุณ)</span>}
                           </p>
-                          <p className="text-xs text-zinc-500 dark:text-zinc-400">{user.slip_count} slips</p>
+                          <p className="text-xs text-zinc-500 dark:text-zinc-400">{user.slip_count} รายการ</p>
                         </div>
                         <div className="text-right">
                           <p className="font-semibold text-zinc-900 dark:text-white">
@@ -588,6 +588,33 @@ export default function DashboardPage() {
                         </div>
                       </div>
                     ))}
+                    
+                    {/* Show current user if not in top 3 */}
+                    {leaderboard.my_user_data && (
+                      <>
+                        <div className="flex items-center gap-2 py-1">
+                          <div className="flex-1 border-t border-dashed border-zinc-300 dark:border-zinc-600"></div>
+                          <span className="text-xs text-zinc-400">...</span>
+                          <div className="flex-1 border-t border-dashed border-zinc-300 dark:border-zinc-600"></div>
+                        </div>
+                        <div className="flex items-center gap-3 p-3 rounded-xl bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700">
+                          <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-sm font-bold text-blue-600 dark:text-blue-400">
+                            {leaderboard.my_user_data.rank}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium truncate text-blue-700 dark:text-blue-300">
+                              {leaderboard.my_user_data.display_name} <span className="text-xs">(คุณ)</span>
+                            </p>
+                            <p className="text-xs text-blue-500 dark:text-blue-400">อันดับที่ {leaderboard.my_user_data.rank} • {leaderboard.my_user_data.slip_count} รายการ</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-semibold text-blue-700 dark:text-blue-300">
+                              ฿{formatCompactCurrency(leaderboard.my_user_data.total_amount)}
+                            </p>
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 ) : (
                   <div className="py-6 text-center text-zinc-400 dark:text-zinc-500">
@@ -625,7 +652,7 @@ export default function DashboardPage() {
                           <p className={`font-medium truncate ${user.is_me ? 'text-blue-700 dark:text-blue-300' : 'text-zinc-900 dark:text-white'}`}>
                             {user.display_name} {user.is_me && <span className="text-xs">(คุณ)</span>}
                           </p>
-                          <p className="text-xs text-zinc-500 dark:text-zinc-400">{user.slip_count} slips ล่าสุด</p>
+                          <p className="text-xs text-zinc-500 dark:text-zinc-400">{user.slip_count} รายการล่าสุด</p>
                         </div>
                         <div className="text-right">
                           <p className="font-semibold text-zinc-900 dark:text-white">

@@ -51,6 +51,7 @@ class SlipSerializer(serializers.ModelSerializer):
     image = serializers.ImageField(required=False, allow_null=True)
     time = serializers.TimeField(required=False, allow_null=True)
     note = serializers.CharField(required=False, allow_blank=True, default='')
+    account_name = serializers.CharField(required=False, allow_blank=True, default='ไม่ระบุ')
 
     class Meta:
         model = Slip

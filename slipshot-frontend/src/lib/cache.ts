@@ -68,11 +68,6 @@ export function clearCache(key?: string): void {
   }
 }
 
-// User-specific cache keys
-export function getUserCacheKey(userId: string | number, key: string): string {
-  return `user_${userId}_${key}`;
-}
-
 // Cache keys
 export const CACHE_KEYS = {
   TAGS: 'tags',

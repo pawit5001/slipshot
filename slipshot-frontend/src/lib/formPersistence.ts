@@ -111,25 +111,4 @@ export function cleanupExpiredForms(): void {
   }
 }
 
-/**
- * React hook for form persistence
- */
-export function useFormPersistence<T extends Record<string, unknown>>(
-  formId: string,
-  initialData: T,
-  ttl = DEFAULT_TTL
-): [T, (data: T) => void, () => void] {
-  // This is a simple implementation - for a real hook, use useState + useEffect
-  const savedData = loadFormData<T>(formId);
-  const data = savedData || initialData;
-  
-  const setData = (newData: T) => {
-    saveFormData(formId, newData, ttl);
-  };
-  
-  const clearData = () => {
-    clearFormData(formId);
-  };
-  
-  return [data, setData, clearData];
-}
+

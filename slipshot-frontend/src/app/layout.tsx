@@ -6,7 +6,6 @@ import AppShell from "../components/AppShell";
 import { AuthProvider } from "@/context/AuthContext";
 import { ModalProvider } from "@/context/ModalContext";
 import { DataCacheProvider } from "@/context/DataCacheContext";
-import { FormPersistProvider } from "@/context/FormPersistContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -37,11 +36,9 @@ export default function RootLayout({
       >
         <AuthProvider>
           <DataCacheProvider>
-            <FormPersistProvider>
-              <ModalProvider>
-                <AppShell>{children}</AppShell>
-              </ModalProvider>
-            </FormPersistProvider>
+            <ModalProvider>
+              <AppShell>{children}</AppShell>
+            </ModalProvider>
           </DataCacheProvider>
         </AuthProvider>
       </body>

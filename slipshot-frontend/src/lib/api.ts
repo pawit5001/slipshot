@@ -51,6 +51,17 @@ export async function fetchWithAuth<T = unknown>(
       credentials: 'include',
     });
 
+    // Handle 429 Too Many Requests - stop immediately
+    if (response.status === 429) {
+      console.log('[API] Rate limited, marking session expired');
+      authService.markSessionExpired();
+      return {
+        status: 429,
+        ok: false,
+        error: 'Too many requests. Please wait and try again.',
+      };
+    }
+
     // Handle 401 Unauthorized
     if (response.status === 401 && retry && retryCount < maxRetries) {
       try {

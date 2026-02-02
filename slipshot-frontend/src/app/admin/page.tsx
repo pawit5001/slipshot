@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { api, SessionExpiredError } from "@/lib/api";
-import { API_ENDPOINTS, API_BASE_URL } from "@/lib/config";
+import { API_ENDPOINTS, API_BASE_URL, formatThaiDate, THAILAND_TIMEZONE } from "@/lib/config";
 import { useModal } from "@/context/ModalContext";
 import type { User } from "@/lib/types";
 
@@ -600,7 +600,7 @@ export default function AdminPage() {
             <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-sm border border-zinc-200 dark:border-zinc-800 p-6">
               <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4 flex items-center gap-2">
                 <TrophyIcon className="w-5 h-5 text-yellow-500" />
-                ผู้ใช้ยอดนิยม (สลิปมากสุด)
+                ผู้ใช้ยอดนิยม (รายการมากที่สุด)
               </h3>
               {stats?.top_users && stats.top_users.length > 0 ? (
                 <div className="space-y-3">
@@ -621,7 +621,7 @@ export default function AdminPage() {
                         <p className="text-xs text-zinc-500">@{u.username}</p>
                       </div>
                       <div className="text-right">
-                        <p className="font-semibold text-zinc-900 dark:text-zinc-100">{u.slip_count} สลิป</p>
+                        <p className="font-semibold text-zinc-900 dark:text-zinc-100">{u.slip_count} รายการ</p>
                         <p className="text-xs text-zinc-500">฿{formatCurrency(u.total_amount || 0)}</p>
                       </div>
                     </div>
@@ -657,8 +657,7 @@ export default function AdminPage() {
                           <p className="text-sm text-zinc-600 dark:text-zinc-400">
                             {(() => {
                               const [date, time] = u.date_joined.split(' ');
-                              const d = new Date(date);
-                              return `${d.toLocaleDateString('th-TH')} ${time || ''}`;
+                              return `${formatThaiDate(date)} ${time || ''}`;
                             })()}
                           </p>
                           <div className="flex gap-1 justify-end mt-1">
@@ -791,8 +790,8 @@ export default function AdminPage() {
                         </div>
                       </td>
                       <td className="py-3 text-zinc-600 dark:text-zinc-400 hidden md:table-cell">{u.email || '-'}</td>
-                      <td className="py-3 text-zinc-600 dark:text-zinc-400">{new Date(u.date_joined).toLocaleDateString('th-TH')}</td>
-                      <td className="py-3 text-zinc-600 dark:text-zinc-400 hidden sm:table-cell">{u.last_login ? new Date(u.last_login).toLocaleDateString('th-TH') : '-'}</td>
+                      <td className="py-3 text-zinc-600 dark:text-zinc-400">{formatThaiDate(u.date_joined)}</td>
+                      <td className="py-3 text-zinc-600 dark:text-zinc-400 hidden sm:table-cell">{u.last_login ? formatThaiDate(u.last_login) : '-'}</td>
                       <td className="py-3 text-zinc-600 dark:text-zinc-400 hidden lg:table-cell">{u.slip_count ?? 0}</td>
                       <td className="py-3">
                         <div className="flex flex-wrap gap-1">
@@ -1083,15 +1082,15 @@ function MiniBarChart({ data, dataKey, color, emptyText }: {
               />
               {/* Tooltip */}
               <div className="absolute bottom-full mb-1 hidden group-hover:block bg-zinc-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-10">
-                {new Date(d.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}: {value}
+                {formatThaiDate(d.date, { day: 'numeric', month: 'short' })}: {value}
               </div>
             </div>
           );
         })}
       </div>
       <div className="flex justify-between mt-2 text-xs text-zinc-400">
-        <span>{data[0] ? new Date(data[0].date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' }) : ''}</span>
-        <span>{data[data.length - 1] ? new Date(data[data.length - 1].date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' }) : ''}</span>
+        <span>{data[0] ? formatThaiDate(data[0].date, { day: 'numeric', month: 'short' }) : ''}</span>
+        <span>{data[data.length - 1] ? formatThaiDate(data[data.length - 1].date, { day: 'numeric', month: 'short' }) : ''}</span>
       </div>
     </div>
   );

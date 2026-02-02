@@ -19,6 +19,7 @@ const translateError = (error: string): string => {
     "Incorrect password": "รหัสผ่านไม่ถูกต้อง",
     "Account is disabled": "บัญชีถูกระงับการใช้งาน",
     "Network Error": "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้",
+    "บัญชีของคุณถูกระงับ กรุณาติดต่อผู้ดูแลระบบ": "บัญชีของคุณถูกระงับ กรุณาติดต่อผู้ดูแลระบบ",
   };
   
   return errorMap[error] || error;
@@ -61,8 +62,8 @@ export default function LoginPage() {
       // Reset auth state after successful login
       api.resetAuth();
       
-      // Refresh auth context
-      await refreshUser();
+      // Refresh auth context (force=true to bypass public path check)
+      await refreshUser(true);
       router.push("/dashboard");
     } catch {
       showAlert("error", "เกิดข้อผิดพลาด", "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ กรุณาลองใหม่อีกครั้ง");
