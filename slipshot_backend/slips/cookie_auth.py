@@ -1,11 +1,9 @@
 from rest_framework_simplejwt.views import TokenObtainPairView
-from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
-from django.conf import settings
-from datetime import timedelta
+from django.contrib.auth import authenticate
 import os
 
 # Check if running in production (HTTPS)
@@ -14,6 +12,25 @@ SECURE_COOKIE = IS_PRODUCTION
 
 class CookieTokenObtainPairView(TokenObtainPairView):
     def post(self, request, *args, **kwargs):
+        # Check if user account is suspended before attempting login
+        username = request.data.get('username', '')
+        password = request.data.get('password', '')
+        
+        if username:
+            from django.contrib.auth.models import User
+            try:
+                user = User.objects.get(username=username)
+                # Check if password is correct first
+                if user.check_password(password):
+                    # Password correct, now check if account is active
+                    if not user.is_active:
+                        return Response({
+                            'detail': 'บัญชีของคุณถูกระงับ กรุณาติดต่อผู้ดูแลระบบ',
+                            'code': 'ACCOUNT_SUSPENDED'
+                        }, status=status.HTTP_403_FORBIDDEN)
+            except User.DoesNotExist:
+                pass  # Let the parent handle invalid username
+        
         response = super().post(request, *args, **kwargs)
         if response.status_code == 200:
             refresh = response.data.get("refresh")
@@ -44,40 +61,6 @@ class CookieTokenObtainPairView(TokenObtainPairView):
             response.data.pop("refresh", None)
             response.data.pop("access", None)
             response.data["authenticated"] = True
-        return response
-
-
-class CookieLogoutView(APIView):
-    """
-    Logout endpoint that clears all auth cookies and optionally blacklists the refresh token.
-    """
-    permission_classes = [AllowAny]
-    
-    def post(self, request, *args, **kwargs):
-        response = Response({"detail": "Successfully logged out"})
-        
-        # Try to blacklist the refresh token (if blacklist is enabled)
-        refresh_token = request.COOKIES.get('refresh_token')
-        if refresh_token:
-            try:
-                token = RefreshToken(refresh_token)
-                token.blacklist()
-            except Exception:
-                # Blacklist might not be enabled or token is invalid
-                pass
-        
-        # Clear all auth cookies
-        response.delete_cookie(
-            key="access_token",
-            path="/",
-            samesite="Lax",
-        )
-        response.delete_cookie(
-            key="refresh_token",
-            path="/",
-            samesite="Lax",
-        )
-        
         return response
 
 

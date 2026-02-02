@@ -7,7 +7,11 @@ from django.db.models import Count, Q, Sum, Avg
 from django.db.models.functions import TruncDate, TruncMonth
 from django.utils import timezone
 from datetime import timedelta
+import pytz
 from .models import Slip, Tag
+
+# Thailand timezone
+THAILAND_TZ = pytz.timezone('Asia/Bangkok')
 
 
 class AdminStatsView(APIView):
@@ -158,7 +162,7 @@ class AdminStatsView(APIView):
             'username': u.username,
             'first_name': u.first_name,
             'last_name': u.last_name,
-            'date_joined': u.date_joined.strftime('%Y-%m-%d %H:%M'),
+            'date_joined': u.date_joined.astimezone(THAILAND_TZ).strftime('%Y-%m-%d %H:%M'),
             'is_active': u.is_active,
             'is_staff': u.is_staff,
         } for u in recent_users_queryset]
@@ -251,8 +255,8 @@ class AdminUsersView(APIView):
             'last_name': user.last_name,
             'is_staff': user.is_staff,
             'is_active': user.is_active,
-            'date_joined': user.date_joined.isoformat(),
-            'last_login': user.last_login.isoformat() if user.last_login else None,
+            'date_joined': user.date_joined.astimezone(THAILAND_TZ).isoformat(),
+            'last_login': user.last_login.astimezone(THAILAND_TZ).isoformat() if user.last_login else None,
             'slip_count': user.slip_count,
         } for user in users]
         

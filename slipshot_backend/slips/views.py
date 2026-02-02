@@ -2,10 +2,10 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework import status, viewsets, permissions, filters, generics
-from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.decorators import action
 from django.contrib.auth.models import User
-from django.db.models import Sum, Q
+from django.db.models import Sum, Q, Max
 from django.http import HttpResponse
 from .models import Slip, Tag
 from .serializers import SlipSerializer, TagSerializer, UserRegisterSerializer
@@ -121,7 +121,7 @@ class SlipViewSet(viewsets.ModelViewSet):
 
 	serializer_class = SlipSerializer
 	permission_classes = [permissions.IsAuthenticated]
-	parser_classes = [MultiPartParser, FormParser]
+	parser_classes = [MultiPartParser, FormParser, JSONParser]
 	filter_backends = [filters.SearchFilter, filters.OrderingFilter]
 	search_fields = ['account_name', 'tag__name', 'type', 'note']
 	ordering_fields = ['date', 'amount', 'created_at']
@@ -896,21 +896,25 @@ class LeaderboardView(APIView):
 		today = timezone.now().date()
 		month_ago = today - timedelta(days=30)
 		
-		# Top users by slip count (all time)
+		# Top users by slip count (all time) - only top 3
 		top_users = User.objects.annotate(
 			slip_count=Count('slips'),
 			total_amount=Sum('slips__amount')
-		).filter(slip_count__gt=0).order_by('-slip_count')[:5]
+		).filter(slip_count__gt=0).order_by('-slip_count', '-total_amount', 'id')[:3]
 		
 		top_users_data = []
+		current_user_in_top3 = False
 		for i, u in enumerate(top_users):
 			display_name = f"{u.first_name} {u.last_name}".strip() or u.username
+			is_me = u.id == current_user_id
+			if is_me:
+				current_user_in_top3 = True
 			top_users_data.append({
 				'rank': i + 1,
 				'display_name': self.mask_name(display_name),
 				'slip_count': u.slip_count,
 				'total_amount': float(u.total_amount or 0),
-				'is_me': u.id == current_user_id,
+				'is_me': is_me,
 			})
 		
 		# Recent active users (last 30 days by slip creation)
@@ -918,8 +922,9 @@ class LeaderboardView(APIView):
 			slips__created_at__date__gte=month_ago
 		).annotate(
 			recent_slip_count=Count('slips', filter=Q(slips__created_at__date__gte=month_ago)),
-			recent_amount=Sum('slips__amount', filter=Q(slips__created_at__date__gte=month_ago))
-		).filter(recent_slip_count__gt=0).order_by('-slips__created_at').distinct()[:5]
+			recent_amount=Sum('slips__amount', filter=Q(slips__created_at__date__gte=month_ago)),
+			latest_slip=Max('slips__created_at')
+		).filter(recent_slip_count__gt=0).order_by('-latest_slip').distinct()[:5]
 		
 		recent_users_data = []
 		for u in recent_active:
@@ -931,17 +936,38 @@ class LeaderboardView(APIView):
 				'is_me': u.id == current_user_id,
 			})
 		
-		# Current user's rank
+		# Current user's rank (considering tie-breakers: slip_count desc, total_amount desc, id asc)
 		my_slip_count = Slip.objects.filter(user=request.user).count()
+		my_total_amount = Slip.objects.filter(user=request.user).aggregate(Sum('amount'))['amount__sum'] or 0
+		
+		# Count users who are ranked higher (more slips, or same slips but more amount, or same both but lower id)
 		my_rank = User.objects.annotate(
-			slip_count=Count('slips')
-		).filter(slip_count__gt=my_slip_count).count() + 1
+			slip_count=Count('slips'),
+			total_amount=Sum('slips__amount')
+		).filter(
+			Q(slip_count__gt=my_slip_count) |
+			Q(slip_count=my_slip_count, total_amount__gt=my_total_amount) |
+			Q(slip_count=my_slip_count, total_amount=my_total_amount, id__lt=request.user.id)
+		).count() + 1
+		
+		# Current user's data for display (if not in top 3)
+		my_user_data = None
+		if not current_user_in_top3 and my_slip_count > 0:
+			display_name = f"{request.user.first_name} {request.user.last_name}".strip() or request.user.username
+			my_user_data = {
+				'rank': my_rank,
+				'display_name': self.mask_name(display_name),
+				'slip_count': my_slip_count,
+				'total_amount': float(my_total_amount),
+				'is_me': True,
+			}
 		
 		return Response({
 			'top_users': top_users_data,
 			'recent_active': recent_users_data,
 			'my_rank': my_rank,
 			'my_slip_count': my_slip_count,
+			'my_user_data': my_user_data,  # None if in top 3 or no slips
 		})
 
 
