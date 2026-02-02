@@ -7,8 +7,10 @@ from rest_framework.permissions import AllowAny
 import os
 
 # Check if running in production (HTTPS)
-IS_PRODUCTION = os.environ.get('DJANGO_ENV', 'development') == 'production'
+IS_PRODUCTION = os.environ.get('DJANGO_DEBUG', 'True').lower() != 'true'
 SECURE_COOKIE = IS_PRODUCTION
+# SameSite=None required for cross-origin cookies (Vercel -> Render)
+SAMESITE_COOKIE = 'None' if IS_PRODUCTION else 'Lax'
 
 
 class CookieTokenRefreshView(APIView):
@@ -43,7 +45,7 @@ class CookieTokenRefreshView(APIView):
                 max_age=5 * 60,  # 5 minutes
                 httponly=True,
                 secure=SECURE_COOKIE,
-                samesite='Lax',
+                samesite=SAMESITE_COOKIE,
                 path='/',
             )
             
@@ -64,7 +66,7 @@ class CookieTokenRefreshView(APIView):
                     max_age=30 * 24 * 60 * 60,  # 30 days
                     httponly=True,
                     secure=SECURE_COOKIE,
-                    samesite='Lax',
+                    samesite=SAMESITE_COOKIE,
                     path='/',
                 )
             

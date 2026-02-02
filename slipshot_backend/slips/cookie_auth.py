@@ -7,8 +7,10 @@ from django.contrib.auth import authenticate
 import os
 
 # Check if running in production (HTTPS)
-IS_PRODUCTION = os.environ.get('DJANGO_ENV', 'development') == 'production'
+IS_PRODUCTION = os.environ.get('DJANGO_DEBUG', 'True').lower() != 'true'
 SECURE_COOKIE = IS_PRODUCTION
+# SameSite=None required for cross-origin cookies (Vercel -> Render)
+SAMESITE_COOKIE = 'None' if IS_PRODUCTION else 'Lax'
 
 class CookieTokenObtainPairView(TokenObtainPairView):
     def post(self, request, *args, **kwargs):
@@ -44,7 +46,7 @@ class CookieTokenObtainPairView(TokenObtainPairView):
                 max_age=cookie_max_age,
                 httponly=True,
                 secure=SECURE_COOKIE,
-                samesite="Lax",
+                samesite=SAMESITE_COOKIE,
                 path="/",
             )
             # Set access token as httpOnly cookie (shorter expiry)
@@ -54,7 +56,7 @@ class CookieTokenObtainPairView(TokenObtainPairView):
                 max_age=5 * 60,  # 5 minutes
                 httponly=True,
                 secure=SECURE_COOKIE,
-                samesite="Lax",
+                samesite=SAMESITE_COOKIE,
                 path="/",
             )
             # Remove tokens from response body for extra security

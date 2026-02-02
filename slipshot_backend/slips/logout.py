@@ -3,6 +3,11 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken
+import os
+
+# Check if running in production (HTTPS)
+IS_PRODUCTION = os.environ.get('DJANGO_DEBUG', 'True').lower() != 'true'
+SAMESITE_COOKIE = 'None' if IS_PRODUCTION else 'Lax'
 
 
 class LogoutView(APIView):
@@ -28,12 +33,12 @@ class LogoutView(APIView):
         response.delete_cookie(
             key="access_token",
             path="/",
-            samesite="Lax",
+            samesite=SAMESITE_COOKIE,
         )
         response.delete_cookie(
             key="refresh_token",
             path="/",
-            samesite="Lax",
+            samesite=SAMESITE_COOKIE,
         )
         
         return response
