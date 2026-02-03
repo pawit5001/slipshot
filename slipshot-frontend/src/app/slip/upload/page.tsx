@@ -464,6 +464,13 @@ export default function SlipUploadPage() {
   const loadingCount = slips.filter(s => s.ocrLoading).length;
   const errorCount = slips.filter(s => s.ocrError).length;
 
+  // Display slips sorted by date/time (newest first)
+  const displayedSlips = slips.slice().sort((a, b) => {
+    const aDate = new Date(`${a.form.date} ${a.form.time || '00:00'}`).getTime();
+    const bDate = new Date(`${b.form.date} ${b.form.time || '00:00'}`).getTime();
+    return bDate - aDate; // newest first
+  });
+
   const removeInvalidSlips = async () => {
     const invalidSlips = slips.filter(s => s.ocrError);
     if (invalidSlips.length === 0) return;
@@ -670,7 +677,7 @@ export default function SlipUploadPage() {
 
       {/* Slip Cards Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {slips.map((slip, index) => (
+        {displayedSlips.map((slip, index) => (
           <div
             key={slip.id}
             className={`bg-white dark:bg-zinc-900 rounded-xl border overflow-hidden transition-all ${
