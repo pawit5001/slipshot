@@ -205,6 +205,12 @@ if not DEBUG:
     SESSION_COOKIE_SAMESITE = 'None'  # Required for cross-origin cookies
     CSRF_COOKIE_SAMESITE = 'None'  # Required for cross-origin cookies
 
+# Do not perform automatic trailing-slash redirects for API requests.
+# When hosting behind a proxy that may strip or add trailing slashes (e.g. Vercel rewrites),
+# Django's APPEND_SLASH behavior can cause redirect loops. Disable it so API routes
+# return 404/401 instead of redirecting.
+APPEND_SLASH = False
+
 
 # Django REST Framework
 REST_FRAMEWORK = {
