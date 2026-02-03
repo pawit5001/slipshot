@@ -26,6 +26,8 @@ const translateError = (error: string): string => {
 };
 
 
+
+export default function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
