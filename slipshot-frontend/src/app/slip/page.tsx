@@ -118,9 +118,11 @@ export default function SlipManager() {
     result.sort((a, b) => {
       let compare = 0;
       switch (sortField) {
-        case "date":
-          compare = a.date.localeCompare(b.date);
-          break;
+        case "date": {
+          const ad = new Date(`${a.date} ${a.time || '00:00'}`).getTime();
+          const bd = new Date(`${b.date} ${b.time || '00:00'}`).getTime();
+          compare = ad === bd ? 0 : (ad < bd ? -1 : 1);
+        } break;
         case "amount":
           compare = Number(a.amount) - Number(b.amount);
           break;
