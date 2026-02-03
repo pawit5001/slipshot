@@ -536,6 +536,14 @@ export default function SlipUploadPage() {
       {/* Upload Zone */}
       <div
         ref={dropZoneRef}
+        onClick={() => fileInputRef.current?.click()}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            fileInputRef.current?.click();
+          }
+        }}
+        role="button"
+        tabIndex={0}
         onDragEnter={handleDrag}
         onDragLeave={handleDrag}
         onDragOver={handleDrag}
@@ -544,7 +552,7 @@ export default function SlipUploadPage() {
           dragActive
             ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
             : "border-zinc-300 dark:border-zinc-700 hover:border-blue-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
-        }`}
+        } cursor-pointer`}
       >
         <input
           type="file"

@@ -45,6 +45,18 @@ const validateName = (name: string, fieldName: string): string | null => {
   return null;
 };
 
+// Username validation: allow letters, numbers, dot, underscore, hyphen. Min 3, max 30.
+const validateUsername = (username: string): string | null => {
+  const trimmed = username.trim();
+  if (!trimmed) return "กรุณากรอกชื่อผู้ใช้";
+  if (trimmed.length < 3) return "ชื่อผู้ใช้ต้องมีอย่างน้อย 3 ตัวอักษร";
+  if (trimmed.length > 30) return "ชื่อผู้ใช้ต้องไม่เกิน 30 ตัวอักษร";
+  if (!/^[a-zA-Z0-9._-]+$/.test(trimmed)) {
+    return "ชื่อผู้ใช้ต้องประกอบด้วยตัวอักษรภาษาอังกฤษ ตัวเลข . _ - เท่านั้น";
+  }
+  return null;
+};
+
 // แปลง error message เป็นภาษาไทย
 const translateError = (error: string): string => {
   const errorMap: Record<string, string> = {
@@ -73,6 +85,7 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [passwordErrors, setPasswordErrors] = useState<string[]>([]);
   const [nameErrors, setNameErrors] = useState<{ firstName?: string; lastName?: string }>({});
+  const [usernameError, setUsernameError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
   const { showAlert } = useModal();
@@ -101,6 +114,10 @@ export default function RegisterPage() {
       const error = validateName(value, 'นามสกุล');
       setNameErrors(prev => ({ ...prev, lastName: error || undefined }));
     }
+    if (field === 'username') {
+      const error = validateUsername(value);
+      setUsernameError(error || null);
+    }
   };
 
   useEffect(() => {
@@ -124,6 +141,16 @@ export default function RegisterPage() {
         lastName: lastNameError || undefined,
       });
       showAlert("error", "ข้อมูลไม่ถูกต้อง", firstNameError || lastNameError || "กรุณากรอกข้อมูลให้ครบถ้วน");
+      return;
+    }
+
+    // Username validation before submit
+    if (!formData.username.trim()) {
+      showAlert("error", "ข้อมูลไม่ถูกต้อง", "กรุณากรอกชื่อผู้ใช้");
+      return;
+    }
+    if (usernameError) {
+      showAlert("error", "ชื่อผู้ใช้ไม่ถูกต้อง", usernameError);
       return;
     }
 
@@ -265,6 +292,9 @@ export default function RegisterPage() {
                   disabled={loading}
                   autoComplete="username"
                 />
+                  {usernameError && (
+                    <p className="mt-1 text-xs text-red-500">{usernameError}</p>
+                  )}
               </div>
 
               {/* Password */}
@@ -357,7 +387,7 @@ export default function RegisterPage() {
               {/* Submit Button */}
               <button
                 type="submit"
-                disabled={loading || passwordErrors.length > 0 || formData.password !== formData.confirmPassword}
+                disabled={loading || passwordErrors.length > 0 || formData.password !== formData.confirmPassword || Boolean(usernameError)}
                 className="w-full py-3 px-4 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all mt-2"
               >
                 {loading ? (
