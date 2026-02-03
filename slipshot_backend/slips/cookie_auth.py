@@ -6,6 +6,7 @@ from rest_framework.permissions import AllowAny
 from django.contrib.auth import authenticate
 from django.conf import settings
 import os
+import logging
 
 # Use Django settings when available so cookie behavior is consistent
 # Default to secure and samesite=None when running in non-debug (production)
@@ -13,6 +14,23 @@ SECURE_COOKIE = getattr(settings, 'SESSION_COOKIE_SECURE', not settings.DEBUG)
 SAMESITE_COOKIE = getattr(settings, 'SESSION_COOKIE_SAMESITE', 'None' if not settings.DEBUG else 'Lax')
 # Optional domain for cookies (useful if you need a shared parent domain)
 COOKIE_DOMAIN = os.environ.get('COOKIE_DOMAIN') or getattr(settings, 'COOKIE_DOMAIN', None)
+
+logger = logging.getLogger(__name__)
+
+def _safe_cookie_domain(request_host: str, configured_domain: str | None) -> str | None:
+    """Return configured_domain only if it appears compatible with request_host.
+    Avoid setting a domain attribute that would place the cookie on the wrong origin.
+    """
+    if not configured_domain:
+        return None
+    # Normalize
+    cd = configured_domain.lstrip('.')
+    rh = request_host.split(':')[0]
+    # If configured domain equals host or is a parent domain of the host, allow it
+    if rh == cd or rh.endswith('.' + cd) or cd.endswith('.' + rh):
+        return configured_domain
+    logger.warning('COOKIE_DOMAIN (%s) does not match request host (%s) — ignoring domain attribute', configured_domain, request_host)
+    return None
 
 class CookieTokenObtainPairView(TokenObtainPairView):
     def post(self, request, *args, **kwargs):
@@ -50,7 +68,7 @@ class CookieTokenObtainPairView(TokenObtainPairView):
                 secure=SECURE_COOKIE,
                 samesite=SAMESITE_COOKIE,
                 path="/",
-                domain=COOKIE_DOMAIN,
+                domain=_safe_cookie_domain(request.get_host(), COOKIE_DOMAIN),
             )
             # Set access token as httpOnly cookie (shorter expiry)
             response.set_cookie(
@@ -61,7 +79,7 @@ class CookieTokenObtainPairView(TokenObtainPairView):
                 secure=SECURE_COOKIE,
                 samesite=SAMESITE_COOKIE,
                 path="/",
-                domain=COOKIE_DOMAIN,
+                domain=_safe_cookie_domain(request.get_host(), COOKIE_DOMAIN),
             )
             # Remove tokens from response body for extra security
             response.data.pop("refresh", None)

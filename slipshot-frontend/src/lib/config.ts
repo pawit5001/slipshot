@@ -1,5 +1,6 @@
 // API Configuration - centralized config for all API calls
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+// Use relative paths so Next.js can proxy `/api/*` to the backend (see next.config.ts rewrites)
+export const API_BASE_URL = '';
 
 export const API_ENDPOINTS = {
   // Auth

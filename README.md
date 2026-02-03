@@ -1,7 +1,8 @@
 
+
 # 🧾 SlipShot - Smart Slip Management System
 
-An intelligent web application for managing and extracting data from payment slips using OCR. Features include categorization, income/expense tracking, statistics dashboard, and admin management.
+SlipShot is a modern, intelligent web application for managing and extracting data from payment slips using OCR. It features powerful categorization, income/expense tracking, a statistics dashboard, and robust admin management. Built with Next.js (frontend) and Django (backend), SlipShot is designed for seamless, secure, and mobile-friendly financial management.
 
 ![Django](https://img.shields.io/badge/Django-5.2-green?style=flat-square&logo=django&logoColor=white)
 ![Next.js](https://img.shields.io/badge/Next.js-16.1.6-black?style=flat-square&logo=next.js&logoColor=white)
@@ -54,7 +55,8 @@ An intelligent web application for managing and extracting data from payment sli
 
 ---
 
-## 🚀 Installation
+
+## 🚀 Getting Started
 
 ### 1. Clone the Repository
 ```bash
@@ -62,7 +64,7 @@ git clone https://github.com/pawit5001/slipshot.git
 cd slipshot
 ```
 
-### 2. Backend Setup
+### 2. Backend Setup (Django)
 ```bash
 cd slipshot_backend
 python -m venv venv
@@ -72,27 +74,56 @@ python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
-# Edit .env with your settings
+# Edit .env with your database, secret key, and OCR settings
 python manage.py migrate
 python manage.py createsuperuser
 python manage.py runserver
 ```
 
-### 3. Frontend Setup
+### 3. Frontend Setup (Next.js)
 ```bash
 cd slipshot-frontend
 npm install
 cp .env.example .env.local
-# Set NEXT_PUBLIC_API_URL=http://localhost:8000
+# Set NEXT_PUBLIC_API_URL=http://localhost:8000 (or your backend URL)
 npm run dev
 ```
 
-### 4. Access
-- **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:8000/api/
-- **Admin Panel**: http://localhost:8000/admin/
+### 4. Access the App
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:8000/api/
+- Admin Panel: http://localhost:8000/admin/
 
 ---
+
+## ☁️ Deployment
+
+SlipShot is production-ready and can be deployed on Vercel (frontend) and Render, Heroku, or any cloud provider (backend).
+
+**Frontend (Vercel):**
+- Connect your GitHub repo to Vercel
+- Set `NEXT_PUBLIC_API_URL` in Vercel project settings to your backend URL
+- Deploy!
+
+**Backend (Render/Heroku):**
+- Add your environment variables (.env)
+- Set up PostgreSQL database
+- Deploy using Render/Heroku dashboard or CLI
+
+---
+
+## 🌍 Environment Variables
+
+**Backend (.env):**
+- `SECRET_KEY`, `DATABASE_URL`, `CORS_ALLOWED_ORIGINS`, `OCR_API_KEY`, etc.
+
+**Frontend (.env.local):**
+- `NEXT_PUBLIC_API_URL=http://localhost:8000` (or your deployed backend URL)
+
+---
+
+---
+
 
 ## 📖 Usage Guide
 
@@ -104,6 +135,9 @@ npm run dev
 6. Manage users and view system stats in the Admin Panel (admin only)
 
 ---
+
+---
+
 
 ## 📁 Project Structure
 
@@ -132,7 +166,8 @@ slipshot/
 
 ---
 
-## 📱 API Endpoints
+
+## 📱 API Endpoints (Selected)
 
 ### Authentication
 | Method | Endpoint | Description |
@@ -177,7 +212,8 @@ slipshot/
 
 ---
 
-## 🔧 Troubleshooting
+
+## 🔧 Troubleshooting & FAQ
 
 ### ❌ Backend won't start
 - Ensure PostgreSQL is running and .env is configured correctly
@@ -189,6 +225,15 @@ slipshot/
 
 ### ❌ OCR not working
 - Check OCR.space API key and network connection
+
+---
+
+
+---
+
+## 🤝 Contributing
+
+Pull requests are welcome! For major changes, please open an issue first to discuss what you would like to change.
 
 ---
 
