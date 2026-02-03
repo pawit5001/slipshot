@@ -58,7 +58,7 @@ An intelligent web application for managing and extracting data from payment sli
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/yourusername/slipshot.git
+git clone https://github.com/pawit5001/slipshot.git
 cd slipshot
 ```
 
