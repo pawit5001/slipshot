@@ -228,6 +228,15 @@ class AuthService {
     this.isSessionExpired = true;
     
     if (typeof window !== 'undefined' && !this.isRedirecting) {
+      // Don't force redirect if user is on a public page (home or auth pages)
+      const pathname = window.location.pathname || '/';
+      const isPublic = pathname === '/' || pathname.startsWith('/auth');
+      if (isPublic) {
+        // mark expired but avoid immediate redirect so public pages remain accessible
+        this.isRedirecting = false;
+        return;
+      }
+
       this.isRedirecting = true;
       // Small delay to allow current operations to complete
       setTimeout(() => {
