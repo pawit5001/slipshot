@@ -18,7 +18,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Public paths that don't require authentication
-const PUBLIC_PATHS = ['/auth/login', '/auth/register', '/'];
+const PUBLIC_PATHS = ['/auth/login', '/auth/register'];
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
