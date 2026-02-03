@@ -4,13 +4,13 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
+from django.conf import settings
 import os
 
-# Check if running in production (HTTPS)
-IS_PRODUCTION = os.environ.get('DJANGO_DEBUG', 'True').lower() != 'true'
-SECURE_COOKIE = IS_PRODUCTION
-# SameSite=None required for cross-origin cookies (Vercel -> Render)
-SAMESITE_COOKIE = 'None' if IS_PRODUCTION else 'Lax'
+# Use Django settings when available so cookie behavior is consistent
+SECURE_COOKIE = getattr(settings, 'SESSION_COOKIE_SECURE', not settings.DEBUG)
+SAMESITE_COOKIE = getattr(settings, 'SESSION_COOKIE_SAMESITE', 'None' if not settings.DEBUG else 'Lax')
+COOKIE_DOMAIN = os.environ.get('COOKIE_DOMAIN') or getattr(settings, 'COOKIE_DOMAIN', None)
 
 
 class CookieTokenRefreshView(APIView):
@@ -47,6 +47,7 @@ class CookieTokenRefreshView(APIView):
                 secure=SECURE_COOKIE,
                 samesite=SAMESITE_COOKIE,
                 path='/',
+                domain=COOKIE_DOMAIN,
             )
             
             # Rotate refresh token for better security (optional but recommended)
@@ -68,6 +69,7 @@ class CookieTokenRefreshView(APIView):
                     secure=SECURE_COOKIE,
                     samesite=SAMESITE_COOKIE,
                     path='/',
+                    domain=COOKIE_DOMAIN,
                 )
             
             return response

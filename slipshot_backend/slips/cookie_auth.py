@@ -4,13 +4,15 @@ from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
 from django.contrib.auth import authenticate
+from django.conf import settings
 import os
 
-# Check if running in production (HTTPS)
-IS_PRODUCTION = os.environ.get('DJANGO_DEBUG', 'True').lower() != 'true'
-SECURE_COOKIE = IS_PRODUCTION
-# SameSite=None required for cross-origin cookies (Vercel -> Render)
-SAMESITE_COOKIE = 'None' if IS_PRODUCTION else 'Lax'
+# Use Django settings when available so cookie behavior is consistent
+# Default to secure and samesite=None when running in non-debug (production)
+SECURE_COOKIE = getattr(settings, 'SESSION_COOKIE_SECURE', not settings.DEBUG)
+SAMESITE_COOKIE = getattr(settings, 'SESSION_COOKIE_SAMESITE', 'None' if not settings.DEBUG else 'Lax')
+# Optional domain for cookies (useful if you need a shared parent domain)
+COOKIE_DOMAIN = os.environ.get('COOKIE_DOMAIN') or getattr(settings, 'COOKIE_DOMAIN', None)
 
 class CookieTokenObtainPairView(TokenObtainPairView):
     def post(self, request, *args, **kwargs):
@@ -48,6 +50,7 @@ class CookieTokenObtainPairView(TokenObtainPairView):
                 secure=SECURE_COOKIE,
                 samesite=SAMESITE_COOKIE,
                 path="/",
+                domain=COOKIE_DOMAIN,
             )
             # Set access token as httpOnly cookie (shorter expiry)
             response.set_cookie(
@@ -58,6 +61,7 @@ class CookieTokenObtainPairView(TokenObtainPairView):
                 secure=SECURE_COOKIE,
                 samesite=SAMESITE_COOKIE,
                 path="/",
+                domain=COOKIE_DOMAIN,
             )
             # Remove tokens from response body for extra security
             response.data.pop("refresh", None)
