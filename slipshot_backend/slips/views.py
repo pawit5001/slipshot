@@ -239,6 +239,8 @@ class SlipViewSet(viewsets.ModelViewSet):
 			'บัญชี', 'account', 'xxx-', 'x-x',
 			'ค่าธรรมเนียม', 'fee',
 			'wallet', 'e-wallet', 'true money', 'truemoney',
+			# คำที่บ่งชี้การทำรายการสำเร็จ — ช่วยให้จับ slip ได้แม้คำหลักน้อย
+			'ชำระเงินสำเร็จ', 'จ่ายบิลสำเร็จ', 'โอนเงินสำเร็จ', 'รายการสำเร็จ',
 		]
 		
 		text_lower = text.lower()
@@ -246,6 +248,16 @@ class SlipViewSet(viewsets.ModelViewSet):
 		
 		# ต้องมีอย่างน้อย 3 keywords ที่บ่งบอกว่าเป็น slip
 		is_likely_slip = slip_keyword_count >= 3
+
+		# ถ้าเจอ 'strong phrases' เช่น "ชำระเงินสำเร็จ" หรือ "จ่ายบิลสำเร็จ" ให้ยอมรับเป็น slip
+		strong_phrases = ['ชำระเงินสำเร็จ', 'จ่ายบิลสำเร็จ', 'โอนเงินสำเร็จ', 'รายการสำเร็จ', 'payment successful', 'transaction successful']
+		if any(p for p in strong_phrases if p in text_lower):
+			is_likely_slip = True
+
+		# ถ้ามีคำว่า 'สำเร็จ' และมีจำนวนเงินหรือเลขอ้างอิง ก็ถือว่าเป็น slip
+		if not is_likely_slip and 'สำเร็จ' in text_lower:
+			if re.search(r'\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?', text) or 'เลขที่รายการ' in text_lower or 'รหัสอ้างอิง' in text_lower:
+				is_likely_slip = True
 		
 		# ถ้าไม่ใช่ slip ให้ return error ทันที
 		if not is_likely_slip:
