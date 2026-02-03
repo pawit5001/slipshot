@@ -6,8 +6,14 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 
 export default function Home() {
-  const { user, loading } = useAuth();
+
+  const { user, loading, refreshUser } = useAuth();
   const router = useRouter();
+
+  // Always force session check on home page
+  useEffect(() => {
+    refreshUser(true);
+  }, [refreshUser]);
 
   useEffect(() => {
     if (!loading && user) {
