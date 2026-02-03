@@ -5,6 +5,7 @@ from .cookie_auth import CookieTokenObtainPairView, CheckAuthView
 from .cookie_refresh import CookieTokenRefreshView
 from .logout import LogoutView
 from .change_password import ChangePasswordView
+from .debug_cookie import DebugCookieView
 from .admin_views import (
     AdminStatsView, AdminUsersView, AdminToggleUserStatusView, AdminToggleAdminView,
     AdminDeleteUserView, AdminBulkDeleteUsersView, AdminUpdateUserView, AdminCreateUserView
@@ -24,6 +25,7 @@ urlpatterns = router.urls + [
 	path('auth/token/cookie/', CookieTokenObtainPairView.as_view(), name='token_obtain_pair_cookie'),
 	path('auth/token/refresh/', CookieTokenRefreshView.as_view(), name='token_refresh_cookie'),
 	path('auth/check/', CheckAuthView.as_view(), name='auth-check'),
+	path('debug/cookies/', DebugCookieView.as_view(), name='debug-cookies'),
     path('auth/logout/', LogoutView.as_view(), name='logout'),
 	path('auth/change_password/', ChangePasswordView.as_view(), name='change-password'),
 	path('auth/check-name/', CheckNameView.as_view(), name='check-name'),
