@@ -191,14 +191,10 @@ const translateError = (error: string): string => {
         <div className="w-full max-w-md">
           {/* Logo */}
           <div className="text-center mb-6">
-            <Link href="/" className="inline-block">
-              <span>
-                <h1 className="text-3xl font-bold text-zinc-900 dark:text-white">
-                  SlipShot
-                </h1>
-                <p className="text-zinc-500 dark:text-zinc-400 text-sm mt-1">เริ่มต้นจัดการการเงินอย่างชาญฉลาด</p>
-              </span>
-            </Link>
+            <h1 className="text-3xl font-bold text-zinc-900 dark:text-white">
+              <Link href="/" className="inline-block">SlipShot</Link>
+            </h1>
+            <p className="text-zinc-500 dark:text-zinc-400 text-sm mt-1">เริ่มต้นจัดการการเงินอย่างชาญฉลาด</p>
           </div>
 
           {/* Register Card */}
