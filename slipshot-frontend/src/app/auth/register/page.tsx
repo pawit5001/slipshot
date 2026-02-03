@@ -61,6 +61,8 @@ const translateError = (error: string): string => {
   return errorMap[error] || error;
 };
 
+export default function RegisterPage() {
+
   const [formData, setFormData] = useState({
     username: "",
     password: "",
