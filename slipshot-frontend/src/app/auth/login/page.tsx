@@ -25,15 +25,27 @@ const translateError = (error: string): string => {
   return errorMap[error] || error;
 };
 
-export default function LoginPage() {
+
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const { refreshUser } = useAuth();
+  const { user, loading: authLoading, refreshUser } = useAuth();
   const { showAlert } = useModal();
-  
+
+  // Always force session check on login page
+  useEffect(() => {
+    refreshUser(true);
+  }, [refreshUser]);
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.replace("/dashboard");
+    }
+  }, [user, authLoading, router]);
+
   // Reset auth state when landing on login page
   useEffect(() => {
     api.resetAuth();

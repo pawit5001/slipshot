@@ -25,7 +25,7 @@ export default function Home() {
     <div className="min-h-screen flex flex-col">
       {/* Hero Section */}
       <section className="relative overflow-hidden bg-linear-to-br from-blue-50 via-violet-50 to-white dark:from-zinc-900 dark:via-zinc-900 dark:to-zinc-800 pt-16">
-        <div className="absolute inset-0 bg-[url('/grid.svg')] bg-center [mask-image:linear-gradient(180deg,white,rgba(255,255,255,0))]"></div>
+        <div className="absolute inset-0 bg-[url('/grid.svg')] bg-center mask-[linear-gradient(180deg,white,rgba(255,255,255,0))]"></div>
         
         {/* Animated background elements */}
         <div className="absolute top-20 left-10 w-72 h-72 bg-blue-400/20 rounded-full blur-3xl animate-pulse"></div>

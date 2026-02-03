@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { API_ENDPOINTS, API_BASE_URL } from "@/lib/config";
 import { useModal } from "@/context/ModalContext";
+import { useAuth } from "@/context/AuthContext";
 import Footer from "@/components/Footer";
 
 // Password validation rules
@@ -60,7 +61,6 @@ const translateError = (error: string): string => {
   return errorMap[error] || error;
 };
 
-export default function RegisterPage() {
   const [formData, setFormData] = useState({
     username: "",
     password: "",
@@ -74,6 +74,19 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
   const { showAlert } = useModal();
+  const { user, loading: authLoading, refreshUser } = useAuth();
+
+  // Always force session check on register page
+  useEffect(() => {
+    refreshUser(true);
+  }, [refreshUser]);
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.replace("/dashboard");
+    }
+  }, [user, authLoading, router]);
 
   const updateField = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
